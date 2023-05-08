@@ -88,7 +88,7 @@ def join_room_kb(invite_link: str):
     )
 
 
-async def to_bot_kb(url: str = None):
+def to_bot_kb(url: str = None):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[

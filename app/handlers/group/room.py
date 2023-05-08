@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import ChatJoinRequest, CallbackQuery, ChatType, Message
@@ -19,6 +21,7 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     await cjr.approve()
     members = await userbot.get_chat_members(cjr.chat.id)
     if deal.customer_id in members and deal.executor_id in members:
+        await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=10))
         await full_room_action(cjr, deal, user_db, post_db)
     else:
         await cjr.bot.send_message(

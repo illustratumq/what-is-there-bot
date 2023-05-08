@@ -137,7 +137,6 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
     )
     deal = await deal_db.add(
         post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
-        next_activity_date=datetime.now() + timedelta(minutes=1)
     )
     message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
                                          reply_markup=moderate_post_kb(post))

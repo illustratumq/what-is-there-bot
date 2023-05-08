@@ -88,7 +88,7 @@ def confirm_deal_activity(deal: Deal):
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.deal.confirm_activity,
-                             callback_data=room_cb.new(deal_id=deal.deal_id, action='confirm_activity'))]
+                              callback_data=room_cb.new(deal_id=deal.deal_id, action='confirm_activity'))]
     ]
 
     return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)

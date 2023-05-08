@@ -4,6 +4,7 @@ from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, Message, ChatType
+from aiogram.utils.deep_linking import get_start_link
 
 from app.database.services.repos import DealRepo, UserRepo, PostRepo
 from app.keyboards.inline.chat import room_cb, back_chat_kb
@@ -121,7 +122,7 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
         f'бота про успішну оплату угоди.'
     )
     await call.message.delete()
-    await call.bot.send_message(deal.chat_id, text, reply_markup=await to_bot_kb())
+    await call.bot.send_message(deal.chat_id, text, reply_markup=to_bot_kb(await get_start_link('')))
     need_to_pay = deal.price - deal.payed if deal.payed < deal.price else 0
     commission = PriceList.calculate_commission(need_to_pay)
     text = (
