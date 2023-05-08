@@ -16,3 +16,7 @@ class ParticipateSG(StatesGroup):
 class MarkerSG(StatesGroup):
     Add = State()
     Delete = State()
+
+
+class CommentSG(StatesGroup):
+    Input = State()

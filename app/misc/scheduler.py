@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from tzlocal import get_localzone
 
 from app.config import Config
+from app.handlers.userbot import UserbotController
 
 
 def _configure_executors() -> dict[str, BaseExecutor]:
@@ -17,7 +18,8 @@ def _configure_executors() -> dict[str, BaseExecutor]:
     }
 
 
-def compose_scheduler(config: Config, bot: Bot, session: sessionmaker) -> ContextSchedulerDecorator:
+def compose_scheduler(config: Config, bot: Bot, session: sessionmaker,
+                      userbot: UserbotController) -> ContextSchedulerDecorator:
     scheduler = ContextSchedulerDecorator(AsyncIOScheduler(
         executors=_configure_executors(),
         timezone=str(get_localzone())
@@ -25,5 +27,6 @@ def compose_scheduler(config: Config, bot: Bot, session: sessionmaker) -> Contex
     scheduler.ctx.add_instance(bot, Bot)
     scheduler.ctx.add_instance(session, sessionmaker)
     scheduler.ctx.add_instance(config, Config)
+    scheduler.ctx.add_instance(userbot, UserbotController)
     scheduler.ctx.add_instance(scheduler, ContextSchedulerDecorator)
     return scheduler

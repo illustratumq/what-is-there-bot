@@ -15,24 +15,34 @@ class User(TimedBaseModel):
     description = sa.Column(sa.VARCHAR(500), nullable=True)
     ban_comment = sa.Column(sa.VARCHAR(500), nullable=True)
 
-    def construct_preview_text(self, rating: int, done_deals: int, rating_deals: int):
+    async def construct_preview_text(self, deal_db):
+        rating, evaluated, deals = await deal_db.calculate_user_rating(self.user_id)
         text = (
             f'📬 Користувач {self.full_name} подав запит на виконання '
             f'вашого завдання\n\n'
             f'Рейтинг: {rating} {self.emojize_rating_text(rating)}\n'
-            f'Кількість виконаних угод: {done_deals}\n'
-            f'Кількість оцінених угод: {rating_deals}\n'
-            f'Про себе: {self.description if self.description else "Немає опису"}'
+            f'Кількість виконаних угод: {deals}\n'
+            f'Кількість оцінених угод: {evaluated}'
         )
+        if self.description:
+            text += f'\nПро себе: {self.description if self.description else "Немає опису"}'
         return text
 
-    def construct_my_rating(self, rating: int, done_deals: int, rating_deals: int):
-        return (
-            f'Рейтинг: {rating} {self.emojize_rating_text(rating)}\n'
-            f'Кількість виконаних угод: {done_deals}\n'
-            f'Кількість оцінених угод: {rating_deals}\n'
-            f'Про себе: {self.description if self.description else "Немає опису"}'
+    async def construct_my_rating(self, deal_db):
+        rating, evaluated, deals = await deal_db.calculate_user_rating(self.user_id)
+        text = (
+            f'Ваш рейтинг: {rating} {self.emojize_rating_text(rating)}\n'
+            f'Кількість ваших виконаних угод: {deals}\n'
+            f'Кількість угод які оцінили: {evaluated}\n'
+            f'Про себе: {self.description if self.description else "Немає опису"}\n\n'
+            f'ℹ Рейтинг рахується тільки для оцінених угод. Неоцінені угоди не впливають на рейтинг.\n\n'
         )
+        if not self.description:
+            text += (
+                'Ви також можете додати короткий опис в розділі "Про себе", який замовник побачить '
+                'у вашому запиті на виконання завдання.'
+            )
+        return text
 
     @staticmethod
     def emojize_rating_text(rating: int) -> str:

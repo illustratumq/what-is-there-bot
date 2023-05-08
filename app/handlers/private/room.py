@@ -1,3 +1,5 @@
+from datetime import timedelta, datetime
+
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatActions, ChatType
@@ -8,6 +10,7 @@ from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.deal import deal_cb, join_room_kb
 from app.misc.commands import set_new_room_commands
+from app.misc.times import now
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
@@ -37,7 +40,8 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     )
     room_chat_id, invite_link = await get_room(call, room_db, userbot)
     await deal_db.update_deal(
-        deal_id, chat_id=room_chat_id, executor_id=executor_id
+        deal_id, chat_id=room_chat_id, executor_id=executor_id,
+        next_activity_date=datetime.now() + timedelta(minutes=1)
     )
     text = (
         f'Угода ухвалена. Заходьте до кімнати замовлення "{post.title}" за цим посиланням:\n\n'

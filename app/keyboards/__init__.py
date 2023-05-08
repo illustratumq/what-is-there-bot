@@ -4,8 +4,8 @@ class Menu:
     to_markers: str = '◀ До сповіщень'
     markers: str = 'Підписки 📚'
     work_times: str = 'Час роботи ⏱'
-    new_marker: str = 'Додати ➕'
-    del_marker: str = 'Видалити ➖'
+    new_marker: str = 'Додати'
+    del_marker: str = 'Видалити'
     new_post: str = 'Новий пост ➕'
     my_posts: str = 'Мої пости 📑'
     my_chats: str = 'Мої чати 💬'
@@ -27,7 +27,10 @@ class Action:
 class Deal:
     chat: str = '💬 Зв\'язатися'
     cancel: str = 'Відхилити'
-    comment: str = '➕💭 Додати відгук'
+    sort: str = 'Відсортувати: {}'
+    comment: str = '💭 Залишити відгук'
+    confirm_activity: str = 'Так, угода акутальна'
+    read_comments: str = 'Читати відгуки...'
     close: str = 'Закрити'
 
 
@@ -41,6 +44,8 @@ class Post:
     confirm: str = 'Підтвержую ✔'
     participate: str = 'Долучитися'
     send_deal: str = 'Надіслати запит ✉'
+    manage_post: str = 'Керувати постом 📝'
+    publish_all: str = 'Опублікувати всі 📬'
     back: str = 'Назад'
 
 
@@ -56,9 +61,18 @@ class Chat:
     cancel: str = 'Відмінити'
 
 
+class Pay:
+    pay_deal_fully = 'Оплатити всю суму угоди'
+    pay_deal_partially = 'Зняти частину з балансу'
+    pay_deal_balance = 'Зняти всю суму з балансу'
+    confirm: str = 'Підтверджую ✔'
+    cancel: str = 'Відмінити'
+
+
 class Buttons:
     menu = Menu()
     action = Action()
     post = Post()
     deal = Deal()
     chat = Chat()
+    pay = Pay()

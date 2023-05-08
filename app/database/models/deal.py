@@ -17,7 +17,10 @@ class Deal(TimedBaseModel):
     payed = sa.Column(sa.INTEGER, default=0, nullable=False)
     status = sa.Column(ENUM(DealStatusEnum), default=DealStatusEnum.MODERATE, nullable=False)
     rating = sa.Column(sa.INTEGER, nullable=True)
-    comment = sa.Column(sa.VARCHAR(300), nullable=True)
+    comment = sa.Column(sa.VARCHAR(500), nullable=True)
+
+    next_activity_date = sa.Column(sa.DateTime, nullable=True)
+    activity_confirm = sa.Column(sa.BOOLEAN, default=True, nullable=False)
 
     @property
     def participants(self):

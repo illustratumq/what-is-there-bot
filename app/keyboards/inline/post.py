@@ -11,13 +11,12 @@ def participate_kb(url: str):
 
 def construct_posts_list_kb(posts: list[Post]):
 
-    def button_cb(post: Post):
-        return dict(callback_data=post_cb.new(post_id=post.post_id, action='edit'))
+    def button_cb(p: Post):
+        return dict(callback_data=post_cb.new(post_id=p.post_id, action='edit'))
 
     inline_keyboard = []
     for post, num in zip(posts, range(1, len(posts) + 1)):
-        inline_keyboard.append(InlineKeyboardButton(f'Пост {num}', **button_cb(post)))
-    inline_keyboard = [inline_keyboard[i:i + 3] for i in range(0, len(inline_keyboard), 3)]
+        inline_keyboard.append([InlineKeyboardButton(f'Пост {num}', **button_cb(post))])
 
     inline_keyboard.append([InlineKeyboardButton(
         Buttons.post.back, callback_data=post_cb.new(post_id=0, action='back')

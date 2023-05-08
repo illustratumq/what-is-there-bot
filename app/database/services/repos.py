@@ -1,6 +1,7 @@
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum
+from app.misc.times import now
 
 
 class UserRepo(BaseRepo[User]):
@@ -22,8 +23,11 @@ class PostRepo(BaseRepo[Post]):
     async def get_post(self, post_id: int) -> Post:
         return await self.get_one(self.model.post_id == post_id)
 
-    async def get_posts_user(self, user_id: int, status: DealStatusEnum) -> list[Post]:
-        return await self.get_all(self.model.user_id == user_id, self.model.status == status)
+    async def get_posts_user(self, user_id: int) -> list[Post]:
+        return await self.get_all(self.model.user_id == user_id)
+
+    async def get_posts_status(self, status: DealStatusEnum) -> list[Post]:
+        return await self.get_all(self.model.status == status)
 
     async def update_post(self, post_id: int, **kwargs) -> None:
         return await self.update(self.model.post_id == post_id, **kwargs)
@@ -41,23 +45,24 @@ class DealRepo(BaseRepo[Deal]):
     async def get_deal_chat(self, chat_id: int) -> Deal:
         return await self.get_one(self.model.chat_id == chat_id)
 
+    async def get_deal_status(self, status: DealStatusEnum) -> list[Deal]:
+        return await self.get_all(self.model.status == status)
+
     async def get_deal_customer(self, customer_id: int, status: DealStatusEnum) -> list[Deal]:
         return await self.get_all(self.model.customer_id == customer_id, self.model.status == status)
+
+    async def get_comment_deals(self, executor_id: int):
+        return await self.get_all(self.model.executor_id == executor_id, self.model.comment != None,
+                                  self.model.status == DealStatusEnum.DONE)
 
     async def get_deal_executor(self, executor_id: int, status: DealStatusEnum) -> list[Deal]:
         return await self.get_all(self.model.executor_id == executor_id, self.model.status == status)
 
     async def calculate_user_rating(self, user_id: int) -> tuple:
         deals = await self.get_all(self.model.executor_id == user_id, self.model.status == DealStatusEnum.DONE)
-        count_deals = len(deals)
-        if count_deals == 0:
-            return 0, 0, 0
-        deals_with_rating = 0
-        user_rating = 0
-        for deal in deals:
-            user_rating += deal.rating if deal.rating else 5
-            deals_with_rating += 1 if deal.rating else 0
-        return count_deals, deals_with_rating, user_rating / count_deals
+        evaluated = [d for d in deals if d.rating]
+        rating = round(sum([d.rating for d in evaluated])/len(evaluated), 2) if evaluated else 0
+        return rating, len(evaluated), len(deals)
 
     async def update_deal(self, deal_id: int, **kwargs) -> None:
         return await self.update(self.model.deal_id == deal_id, **kwargs)

@@ -2,7 +2,7 @@ from pyrogram import Client
 from pyrogram.errors import ChatIdInvalid
 from pyrogram.raw.core import TLObject
 from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
-from pyrogram.types import Chat, ChatInviteLink, ChatPermissions
+from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
 
 from app.config import UserBot
 
@@ -21,12 +21,20 @@ class UserbotController:
             return (await self._client.get_me()).id
 
     async def clean_chat_history(self, chat_id: int):
-        async with self._client as Client:
-            history = Client.get_chat_history(chat_id=chat_id)
+        async with self._client as client:
+            history = client.get_chat_history(chat_id=chat_id)
             message_ids = []
             async for msg in history:
                 message_ids.append(msg.id)
-            await Client.delete_messages(chat_id=chat_id, message_ids=message_ids)
+            await client.delete_messages(chat_id=chat_id, message_ids=message_ids)
+
+    async def get_chat_members(self, chat_id: int) -> list:
+        members = []
+        async with self._client as client:
+            async for member in client.get_chat_members(chat_id):
+                member: ChatMember
+                members.append(member.user.id)
+        return members
 
     async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink]:
         async with self._client as client:

@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from aiogram import Bot, Dispatcher
+from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.utils.markdown import hide_link
 from apscheduler_di import ContextSchedulerDecorator
@@ -8,24 +11,89 @@ from app.database.models import Post
 from app.database.services.enums import DealStatusEnum
 from app.database.services.repos import PostRepo, UserRepo, DealRepo, MarkerRepo
 from app.filters import IsAdminFilter
-from app.keyboards.inline.moderate import confirm_post_moderate, moderate_post_kb, moderate_post_cb
+from app.keyboards.inline.moderate import confirm_post_moderate, moderate_post_kb, moderate_post_cb, \
+    after_public_edit_kb, public_all_post_cb, public_post_cb
 from app.keyboards.inline.post import participate_kb
-from app.misc.times import next_run_time
+from app.misc.times import next_run_time, now
 
 
 async def back_moderate_post(call: CallbackQuery, callback_data: dict, post_db: PostRepo, user_db: UserRepo,
-                             config: Config):
+                             config: Config, state: FSMContext):
     admin_id = int(callback_data['admin_id'])
     admin = await user_db.get_user(admin_id)
     if call.from_user.id != admin_id:
         return await call.answer(f'Цей пост вже модерує {admin.full_name}', show_alert=True)
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
+    await state.finish()
     await call.bot.edit_message_text(
-        chat_id=config.misc.admin_channel_id, message_id=post.message_id, text=post.construct_post_text(use_bot_link=False),
+        chat_id=config.misc.admin_channel_id, message_id=post.admin_message_id,
+        text=post.construct_post_text(use_bot_link=False),
         reply_markup=moderate_post_kb(post)
-
     )
+
+
+async def publish_all_confirm(call: CallbackQuery, callback_data: dict, post_db: PostRepo, user_db: UserRepo,
+                              state: FSMContext):
+    admin_id = int(callback_data['admin_id'])
+    post_id = int(callback_data['post_id'])
+    admin = await user_db.get_user(admin_id)
+    post = await post_db.get_post(post_id)
+
+    if admin and call.from_user.id != admin_id:
+        return await call.answer(f'Цю дію вже модерує {admin.full_name}', show_alert=True)
+    if not admin:
+        admin = await user_db.get_user(call.from_user.id)
+
+    data = await state.get_data()
+    delay = data['current_delay'] if 'current_delay' in data.keys() else 30
+
+    if callback_data['action'] == 'set_delay':
+        delay = int(callback_data['delay'])
+    elif callback_data['action'] == 'plus_delay':
+        delay += int(callback_data['delay'])
+    elif callback_data['action'] == 'minus_delay':
+        delay -= int(callback_data['delay'])
+
+    if delay < 10:
+        await state.update_data(current_delay=10)
+        await call.answer('Мінімальна затримка 10 секунд', show_alert=True)
+        return
+
+    posts = await post_db.get_posts_status(DealStatusEnum.MODERATE)
+    end_published_time = now() + timedelta(seconds=len(posts) * delay)
+    text = (
+        f'Ви хочете опублікувати {len(posts)} постів?\n\n'
+        f'Пости будуть опубліковані з затримкою {delay} секунд, орієнтовний час останньої публікації '
+        f'{end_published_time.strftime("%H:%M:%S")}. Для того щоб змінити затримку між публікаціями '
+        f'використовуйте кнопки нижче.\n\n'
+        f'Будь-ласка, підтвердіть публікацію всіх постів.'
+    )
+    await call.message.edit_text(text, reply_markup=public_all_post_cb(admin, post, delay))
+    await state.update_data(current_delay=delay)
+
+
+async def publish_all_posts_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, user_db: UserRepo,
+                                deal_db: DealRepo, marker_db: MarkerRepo, state: FSMContext,
+                                scheduler: ContextSchedulerDecorator, config: Config):
+    await state.finish()
+    delay = int(callback_data['delay'])
+    posts = await post_db.get_posts_status(DealStatusEnum.MODERATE)
+    for post in posts:
+        if post.admin_message_id:
+            await post_db.update_post(post.post_id, status=DealStatusEnum.WAIT)
+            await call.bot.edit_message_text(chat_id=config.misc.admin_channel_id, message_id=post.admin_message_id,
+                                             text=post.construct_post_text(use_bot_link=False),
+                                             disable_web_page_preview=False if post.media_url else True)
+        scheduler.add_job(
+            func=publish_all_posts_processing, name=f'Публікація поста в резервному каналі через {delay} c.',
+            next_run_time=next_run_time(delay), trigger='date', misfire_grace_time=300,
+            kwargs=dict(call=call, callback_data=callback_data, post_db=post_db, deal_db=deal_db,
+                        marker_db=marker_db, user_db=user_db)
+        )
+        delay += delay
+    await call.answer('Публікація постів успішно запланована', show_alert=True)
+    await call.message.delete_reply_markup()
 
 
 async def approve_post_publish(call: CallbackQuery, callback_data: dict, post_db: PostRepo,
@@ -59,7 +127,7 @@ async def cancel_post_publish(call: CallbackQuery, callback_data: dict, post_db:
 
 
 async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, user_db: UserRepo,
-                           deal_db: DealRepo, config: Config):
+                           deal_db: DealRepo):
     admin_id = int(callback_data['admin_id'])
     admin = await user_db.get_user(admin_id)
     if call.from_user.id != admin_id:
@@ -67,13 +135,24 @@ async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: Po
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     admin_channel_text = (
-        f'<b>Пост #{post.post_id} відхилено</b>\n\n'
+        f'<b>Статус:</b> Пост #{post.post_id} відхиилено\n'
+        f'<b>Модератор:</b> {call.from_user.mention}\n\n'
         f'{post.construct_post_text(use_bot_link=False)}'
     )
     await deal_db.delete_deal(post.deal_id)
     await post_db.delete_post(post.post_id)
-    await call.message.edit_text(admin_channel_text, disable_web_page_preview=True if post.media_url else False)
+    await call.message.edit_text(admin_channel_text, disable_web_page_preview=False if post.media_url else True)
     await call.bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" було відхилено адміністрацією')
+
+
+async def publish_all_posts_processing(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
+                                       marker_db: MarkerRepo, user_db: UserRepo, config: Config,
+                                       scheduler: ContextSchedulerDecorator):
+    posts = await post_db.get_posts_status(DealStatusEnum.WAIT)
+    posts.sort(key=lambda p: p.created_at, reverse=True)
+    post = posts[0]
+    callback_data.update(post_id=post.post_id)
+    await admin_approve_cmd(call, callback_data, post_db, deal_db, marker_db, user_db, config, scheduler)
 
 
 async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
@@ -83,28 +162,29 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     admin = await user_db.get_user(admin_id)
     if call.from_user.id != admin_id:
         return await call.answer(f'Цей пост вже модерує {admin.full_name}', show_alert=True)
-
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
+    await post_db.update_post(post_id, status=DealStatusEnum.ACTIVE)
     message = await call.bot.send_message(
         config.misc.reserv_channel_id, post.construct_post_text(),
         reply_markup=participate_kb(await post.construct_participate_link()),
         disable_web_page_preview=True if not post.media_id else False
     )
-    await post_db.update_post(post_id, status=DealStatusEnum.ACTIVE, reserv_message_id=message.message_id)
+    await post_db.update_post(post_id, reserv_message_id=message.message_id)
     await deal_db.update_deal(post.deal_id, status=DealStatusEnum.ACTIVE)
     scheduler.add_job(
         publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
         kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db),
         name=f'Публікація поста #{post.post_id} на основному каналі'
     )
-    await call.answer('Публікацію підтверджено')
     admin_channel_text = (
         f'<b>Статус:</b> Пост #{post.post_id} схвалено ✔\n'
         f'<b>Модератор:</b> {call.from_user.mention}\n\n'
         f'{post.construct_post_text(use_bot_link=False)}'
     )
-    await call.message.edit_text(text=admin_channel_text, disable_web_page_preview=True if post.media_url else False)
+    await call.bot.edit_message_text(text=admin_channel_text, chat_id=config.misc.admin_channel_id,
+                                     message_id=post.admin_message_id, reply_markup=await after_public_edit_kb(post),
+                                     disable_web_page_preview=False if post.media_url else True)
 
 
 async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, config: Config):
@@ -116,12 +196,16 @@ async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, mar
     )
     await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
     await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
+    await markers_post_processing(marker_db, post, bot, message.url)
+
+
+async def markers_post_processing(marker_db: MarkerRepo, post: Post, bot: Bot, url: str):
     markers = await marker_db.get_markers_title(post.title)
     for marker in markers:
         try:
             await bot.send_message(
                 marker.user_id,
-                text=f'На каналі з\'явився пост по вашій підписці "{marker.text}"{hide_link(message.url)}'
+                text=f'На каналі з\'явився пост по вашій підписці "{marker.text}"{hide_link(url)}'
             )
         except:
             pass
@@ -139,3 +223,9 @@ def setup(dp: Dispatcher):
         admin_approve_cmd, IsAdminFilter(), moderate_post_cb.filter(action='conf_approve'), state='*')
     dp.register_callback_query_handler(
         admin_cancel_cmd, IsAdminFilter(), moderate_post_cb.filter(action='conf_cancel'), state='*')
+    dp.register_callback_query_handler(
+        publish_all_confirm, IsAdminFilter(), moderate_post_cb.filter(action='publish_all'), state='*')
+    dp.register_callback_query_handler(
+        publish_all_posts_cmd, IsAdminFilter(), public_post_cb.filter(action='publish_all'), state='*')
+    dp.register_callback_query_handler(
+        publish_all_confirm, IsAdminFilter(), public_post_cb.filter(), state='*')

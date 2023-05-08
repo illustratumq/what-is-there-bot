@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+import aiogram
 import betterlogging as bl
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.redis import RedisStorage2
@@ -11,6 +12,7 @@ from app.config import Config
 from app.database.services.db_engine import create_db_engine_and_session_pool
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
+from app.misc.cron import setup_cron_function
 from app.misc.scheduler import compose_scheduler
 
 log = logging.getLogger(__name__)
@@ -27,7 +29,10 @@ async def set_bot_commands(bot: Bot) -> None:
 
 async def notify_admin(bot: Bot, admin_ids: tuple[int]) -> None:
     for admin_id in admin_ids:
-        await bot.send_message(admin_id, 'Бот запущено')
+        try:
+            await bot.send_message(admin_id, 'Бот запущено')
+        except aiogram.exceptions.ChatNotFound:
+            log.warning(f'Адмін з {admin_id} не ініціалізував чат.')
 
 
 async def main():
@@ -39,8 +44,8 @@ async def main():
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
-    scheduler = compose_scheduler(config, bot, sqlalchemy_session)
     userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
+    scheduler = compose_scheduler(config, bot, sqlalchemy_session, userbot)
 
     allowed_updates = (
             AllowedUpdates.MESSAGE + AllowedUpdates.CALLBACK_QUERY +
@@ -51,6 +56,7 @@ async def main():
     environments = dict(config=config, dp=dp, scheduler=scheduler, userbot=userbot)
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
+    setup_cron_function(scheduler)
 
     await set_bot_commands(bot)
     # await notify_admin(bot, config.bot.admin_ids)

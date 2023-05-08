@@ -14,6 +14,6 @@ class PriceList:
     @staticmethod
     def calculate_commission(price: int) -> int:
         if price <= 200:
-            return 10
+            return 5
         else:
             return int(round(price * 0.05))

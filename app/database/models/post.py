@@ -42,12 +42,16 @@ class Post(TimedBaseModel):
         )
 
     def construct_post_status(self) -> str:
-        if self.status in (DealStatusEnum.ACTIVE, DealStatusEnum.MODERATE):
+        if self.status == DealStatusEnum.ACTIVE:
             return PostStatusText.ACTIVE
+        if self.status == DealStatusEnum.MODERATE:
+            return PostStatusText.MODERATE
         elif self.status == DealStatusEnum.BUSY:
             return PostStatusText.BUSY
         elif self.status == DealStatusEnum.DONE:
             return PostStatusText.DONE
+        elif self.status == DealStatusEnum.WAIT:
+            return PostStatusText.WAIT
         else:
             return 'Відхилено'
 
@@ -56,6 +60,9 @@ class Post(TimedBaseModel):
 
     async def construct_participate_link(self):
         return await get_start_link(f'participate-{self.deal_id}')
+
+    async def construct_manage_link(self):
+        return await get_start_link(f'manage_post-{self.deal_id}')
 
     def construct_html_link(self, text: str):
         return f'<a href="{self.post_url}">{text}</a>'

@@ -5,18 +5,20 @@ from aiogram.types import ChatJoinRequest, CallbackQuery, ChatType, Message
 from app.config import Config
 from app.database.models import Deal
 from app.database.services.repos import DealRepo, UserRepo, PostRepo
+from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import room_menu_kb, room_cb
 
 
 async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, user_db: UserRepo,
-                                    post_db: PostRepo, config: Config):
+                                    post_db: PostRepo, userbot: UserbotController):
     deal = await deal_db.get_deal_chat(cjr.chat.id)
     if not deal or cjr.from_user.id not in deal.participants:
         await cjr.bot.send_message(cjr.from_user.id, 'Ви не є учасником цього завдання')
         await cjr.decline()
         return
     await cjr.approve()
-    if await cjr.chat.get_member_count() == 3:
+    members = await userbot.get_chat_members(cjr.chat.id)
+    if deal.customer_id in members and deal.executor_id in members:
         await full_room_action(cjr, deal, user_db, post_db)
     else:
         await cjr.bot.send_message(
@@ -31,16 +33,17 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
     text = (
         '<b>Ви стали учасниками угоди. Можете приступати до обговорення.</b>\n\n'
         f'Замовник: {customer.mention}\n'
-        f'Виконавець: {executor.mention}\n\n'
+        f'Виконавець: {executor.mention}\n'
+        f'Ціна угоди: {deal.construct_price()}\n'
         f'ℹ Якщо Ви не знаєте правил нашого сервісу, то радимо ознайомитись '
         f'з ними тут (посилання).\n\n'
-        f'Для повторного виклику меню, скористайтесь комндою /menu'
+        f'Для повторного виклику меню, скористайтесь командою /menu'
     )
     await cjr.bot.send_message(cjr.chat.id, text)
     message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
+    await cjr.chat.pin_message(message_id=message.message_id)
     await message.answer('Меню чату. Для повторного виклику натисніть /menu',
                          reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
-    await cjr.chat.pin_message(message_id=message.message_id)
 
 
 async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,

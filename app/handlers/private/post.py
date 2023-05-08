@@ -1,4 +1,5 @@
 from contextlib import suppress
+from datetime import timedelta, datetime
 
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
@@ -12,6 +13,7 @@ from app.database.services.repos import PostRepo, DealRepo
 from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
+from app.misc.times import now
 from app.states.states import PostSG
 
 cancel_kb = basic_kb([Buttons.action.cancel])
@@ -134,7 +136,8 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
         media_id=data['media_id'], media_url=data['media_url'], user_id=msg.from_user.id,
     )
     deal = await deal_db.add(
-        post_id=post.post_id, customer_id=msg.from_user.id, price=post.price
+        post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
+        next_activity_date=datetime.now() + timedelta(minutes=1)
     )
     message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
                                          reply_markup=moderate_post_kb(post))

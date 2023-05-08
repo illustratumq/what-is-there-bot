@@ -16,6 +16,8 @@ class PostStatusText:
     ACTIVE = '⚪ Активно'
     BUSY = '🟠 Виконується'
     DONE = '✅ Виконано'
+    MODERATE = '📌 Очікує модерації'
+    WAIT = '🕓 Очікує публікації'
 
 
 class RoomStatusEnum(Enum):
@@ -29,3 +31,4 @@ class DealStatusEnum(Enum):
     DONE = 'DONE'
     DISABLES = 'DISABLED'
     MODERATE = 'MODERATE'
+    WAIT = 'WAIT'
