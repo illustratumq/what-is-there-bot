@@ -122,7 +122,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     except:
         pass
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
-                              payed=0, chat_id=None, executor_id=None)
+                              payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
 
 async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: PostRepo.model, customer: UserRepo.model,

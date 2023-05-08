@@ -77,9 +77,29 @@ async def send_media_chat(call: CallbackQuery, callback_data: dict, deal_db: Dea
     )
 
 
+async def confirm_room_activity(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo):
+    await call.message.delete()
+    deal_id = int(callback_data['deal_id'])
+    deal = await deal_db.get_deal(deal_id)
+    await deal_db.update_deal(deal.deal_id, activity_confirm=True,
+                              next_activity_date=datetime.now() + timedelta(minutes=10))
+    user = await user_db.get_user(call.from_user.id)
+    text = (
+        f'✅ {user.create_html_link("Замовник" if user.user_id == deal.customer_id else "Виконавець")} підтвердив '
+        f'актуальність угоди. Можете провдожувати роботу!\n\n'
+        f'Зверніть увагу, повідомлення про активність в чаті автоматично надисилається кожні 12 годин, якщо '
+        f'ваша угода неоплачена.\n\n'
+        f'Якщо протягом настпуних 12 годин, після цього, активність не буде підтверджена, угода буде '
+        f'автоматично відмінена.'
+    )
+    await call.bot.send_message(deal.chat_id, text)
+
+
 def setup(dp: Dispatcher):
     dp.register_chat_join_request_handler(process_chat_join_request, state='*')
     dp.register_message_handler(chat_menu_cmd, ChatTypeFilter(ChatType.GROUP), Command('menu'), state='*')
     dp.register_callback_query_handler(
         send_media_chat, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='send_media'), state='*')
+    dp.register_callback_query_handler(
+        confirm_room_activity, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='confirm_activity'), state='*')
 
