@@ -1,3 +1,4 @@
+import os
 from contextlib import suppress
 from datetime import timedelta, datetime
 
@@ -15,6 +16,7 @@ from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
 from app.misc.media_template import make_media_template
+from app.misc.pirce import PriceList
 from app.misc.times import now
 from app.states.states import PostSG
 
@@ -26,7 +28,7 @@ async def new_post_title(msg: Message, state: FSMContext):
         'Напишіть назву предмету або що потрібно зробити'
     )
     message = await msg.answer(text, reply_markup=cancel_kb)
-    await state.update_data(last_msg_id=message.message_id)
+    await state.update_data(last_msg_id=message.message_id, template_media_file=None)
     await PostSG.Title.set()
 
 
@@ -95,8 +97,10 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
     is_template_photo = False
     if not data['media']:
         is_template_photo = True
-        data['media'] = [make_media_template(data['title'], data['about'])]
+        media_file = make_media_template(data['title'], data['about'])
+        data['media'] = [media_file]
         data['media_type'] = ContentType.PHOTO
+        await state.update_data(template_media_file=media_file)
     data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot, is_template_photo)
     post_msg = await msg.answer(construct_post_text(data))
     await state.update_data(post_message_id=post_msg.message_id)
@@ -147,6 +151,8 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
     message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
                                          reply_markup=moderate_post_kb(post))
     await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
+    if data['template_media_file']:
+        os.remove(data['template_media_file'])
     text = (
         'Ваш пост відправлений на модерацію 👌'
     )
@@ -208,7 +214,8 @@ def check_is_price_ok(price: str, data: dict) -> bool:
         return True
     elif price.isnumeric():
         price = int(price)
-        if 10 <= price <= 10000 or price == 0:
+        price_list = PriceList.current()
+        if price_list.minimal_price <= price <= price_list.maximal_price or price == 0:
             data.update({'price': price})
             return True
     else:

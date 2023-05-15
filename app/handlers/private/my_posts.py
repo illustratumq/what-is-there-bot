@@ -41,7 +41,6 @@ async def edit_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostR
             DealStatusEnum.DISABLES: 'він був відхилений модератором'
         }
         text += f'Ви не можете редагувати цей пост, оскільки {status[post.status]}\n\n'
-    print(post.post_url)
     text += f'{post.construct_html_link("Перейти до поста в каналі")}\n'
     await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post, allow_edit_post))
 

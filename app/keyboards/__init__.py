@@ -2,6 +2,7 @@
 
 class Menu:
     to_markers: str = '◀ До сповіщень'
+    to_rating: str = '◀ До рейтингу'
     markers: str = 'Підписки 📚'
     work_times: str = 'Час роботи ⏱'
     new_marker: str = 'Додати'
@@ -28,6 +29,13 @@ class Action:
 class DealAdmin:
     enter_chat: str = '🚪 Увійти в чат'
     refuse_chat: str = 'Відмовитися'
+    done_deal: str = 'Завершити угоду'
+    cancel_deal: str = 'Відмінити угоду'
+    ban_user: str = '🔒 Блокувати користувача'
+    restrict_user: str = '🔐 Обмежити користувача'
+    close: str = 'Закрити'
+    confirm: str = 'Так, я на 100% впевнений'
+    back: str = '◀ Назад'
 
 
 class Deal:

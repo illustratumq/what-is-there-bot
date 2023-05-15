@@ -111,7 +111,8 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     for user_id in deal.participants:
         text = default_text if not message else message
         await bot.send_message(user_id, text)
-    await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE)
+    await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
+                              message_id=None)
     if reset_state:
         await state.storage.reset_data(chat=deal.chat_id, user=deal.customer_id)
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
@@ -183,7 +184,8 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             await call.bot.edit_message_text(
                 post.construct_post_text(), config.misc.post_channel_chat_id, post.message_id
             )
-        await room_db.update_room(call.message.chat.id, status=RoomStatusEnum.AVAILABLE)
+        await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
+                                  message_id=None)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
         # await userbot.clean_chat_history(chat_id=call.message.chat.id)
@@ -241,14 +243,15 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
                                   config: Config):
     deal = await deal_db.get_deal_chat(msg.chat.id)
-    customer = await user_db.get_user(deal.customer_id)
-    post = await post_db.get_post(deal.post_id)
-    user = 'Замовник' if msg.from_user.id == customer.user_id else 'Виконавець'
-    text = (
-        f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
-    )
-    await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                 userbot, config, message=text)
+    if deal:
+        customer = await user_db.get_user(deal.customer_id)
+        post = await post_db.get_post(deal.post_id)
+        user = 'Замовник' if msg.from_user.id == customer.user_id else 'Виконавець'
+        text = (
+            f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
+        )
+        await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
+                                     userbot, config, message=text)
 
 
 def setup(dp: Dispatcher):
@@ -264,8 +267,8 @@ def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
         handle_confirm_cancel_deal, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='conf_cancel_deal'),
         state='conf_cancel_deal')
-    # dp.register_message_handler(
-    #     left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
+    dp.register_message_handler(
+        left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
     dp.register_callback_query_handler(
         cancel_action_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='back'), state='*')
 

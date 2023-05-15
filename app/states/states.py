@@ -20,3 +20,7 @@ class MarkerSG(StatesGroup):
 
 class CommentSG(StatesGroup):
     Input = State()
+
+
+class UserAboutSG(StatesGroup):
+    Input = State()

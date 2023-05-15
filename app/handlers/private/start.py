@@ -38,9 +38,9 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
     elif deal.customer_id == msg.from_user.id:
         await msg.answer('Ви не можете долучитися до свого завдання')
         return
-    elif msg.from_user.id in deal.willing_ids:
-        await msg.answer('Ви вже відправили запит на це завдання')
-        return
+    # elif msg.from_user.id in deal.willing_ids:
+    #     await msg.answer('Ви вже відправили запит на це завдання')
+    #     return
     text = (
         f'Ви хочете стати виконавцем завдання.\n\n'
         f'Для цього, надішліть коментар, який побачить замовник у Вашому запиті, і натисніть кнопку '

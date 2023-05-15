@@ -14,9 +14,11 @@ class Room(TimedBaseModel):
     admin_id = sa.Column(sa.BIGINT, nullable=True)
     message_id = sa.Column(sa.BIGINT, nullable=True)
 
-    def construct_admin_moderate_text(self):
-        text = (
+    def construct_admin_moderate_text(self) -> str:
+        return (
             f'Потрбіна модерація в чаті: "{self.name}"\n\n'
             f'⚒ #Виклик_Адміністратора'
         )
-        return text
+
+    def construct_html_text(self, text: str) -> str:
+        return f'<a href="{self.invite_link}">{text}</a>'

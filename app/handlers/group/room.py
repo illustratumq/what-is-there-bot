@@ -43,7 +43,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
         room = await room_db.get_room(deal.chat_id)
         await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True)
     except Exception as Error:
-        await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина: {Error}')
+        await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина:\n\n{Error}')
     await set_new_room_commands(call.bot, deal.chat_id, admin_id)
     await deal_db.update_deal(deal.deal_id, next_activity_date=None)
 
@@ -57,8 +57,9 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'Замовник: {customer.mention}\n'
         f'Виконавець: {executor.mention}\n'
         f'Ціна угоди: {deal.construct_price()}\n'
+        f'🆔 #Угода_номер_{deal.deal_id}\n'
         f'ℹ Якщо Ви не знаєте правил нашого сервісу, то радимо ознайомитись '
-        f'з ними тут (посилання).\n\n'
+        f'з ними тут (посилання).\n\n'  # TODO: додати посилання на правила сервісу
         f'Для повторного виклику меню, скористайтесь командою /menu'
     )
     await cjr.bot.send_message(cjr.chat.id, text)
