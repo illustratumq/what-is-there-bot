@@ -32,21 +32,18 @@ async def my_posts_cmd(msg: Message, post_db: PostRepo):
 async def edit_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo):
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
-    if post.status != DealStatusEnum.ACTIVE:
-
-        if post.status == DealStatusEnum.MODERATE:
-            status = 'він ще не схвалений модератором'
-        elif post.status == DealStatusEnum.BUSY:
-            status = 'він вже виконується у чаті'
-        else:
-            status = 'він був відхилений модератором'
-        await call.answer(f'Ви не можете редагувати цей пост, оскільки {status}', show_alert=True)
-        return
-    text = (
-        f'{post.construct_post_text(use_bot_link=False)}\n\n'
-        f'{post.construct_html_link("Перейти до поста в каналі")}'
-    )
-    await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post))
+    text = f'{post.construct_post_text(use_bot_link=False)}\n\n'
+    allow_edit_post = post.status == DealStatusEnum.ACTIVE
+    if not allow_edit_post:
+        status = {
+            DealStatusEnum.MODERATE: 'він ще не схвалений модератором',
+            DealStatusEnum.BUSY: 'він вже виконується у чаті',
+            DealStatusEnum.DISABLES: 'він був відхилений модератором'
+        }
+        text += f'Ви не можете редагувати цей пост, оскільки {status[post.status]}\n\n'
+    print(post.post_url)
+    text += f'{post.construct_html_link("Перейти до поста в каналі")}\n'
+    await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post, allow_edit_post))
 
 
 async def delete_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo):
@@ -88,9 +85,10 @@ async def update_post_cmd(call: CallbackQuery, callback_data: dict, post_db: Pos
     post = await post_db.get_post(post_id)
     seconds_after_public = (now() - localize(post.updated_at)).seconds
     if seconds_after_public >= 15*60:
-        await call.bot.delete_message(
-            config.misc.post_channel_chat_id, post.message_id
-        )
+        if post.post_id:
+            await call.bot.delete_message(
+                config.misc.post_channel_chat_id, post.message_id
+            )
         msg = await call.bot.send_message(
             config.misc.post_channel_chat_id, text=post.construct_post_text(),
             reply_markup=participate_kb(await post.construct_participate_link())

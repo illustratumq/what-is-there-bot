@@ -4,7 +4,8 @@ from datetime import timedelta, datetime
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter, MediaGroupFilter
-from aiogram.types import Message, ChatType, ContentType, InputMediaPhoto, InputMediaDocument, MediaGroup, ContentTypes
+from aiogram.types import Message, ChatType, ContentType, InputMediaPhoto, InputMediaDocument, MediaGroup, ContentTypes, \
+    InputFile
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
@@ -13,6 +14,7 @@ from app.database.services.repos import PostRepo, DealRepo
 from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
+from app.misc.media_template import make_media_template
 from app.misc.times import now
 from app.states.states import PostSG
 
@@ -90,8 +92,12 @@ async def add_media_to_post(msg: Message, state: FSMContext):
 
 async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config):
     data = await state.get_data()
-    if data['media']:
-        data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot)
+    is_template_photo = False
+    if not data['media']:
+        is_template_photo = True
+        data['media'] = [make_media_template(data['title'], data['about'])]
+        data['media_type'] = ContentType.PHOTO
+    data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot, is_template_photo)
     post_msg = await msg.answer(construct_post_text(data))
     await state.update_data(post_message_id=post_msg.message_id)
     await msg.answer(
@@ -233,9 +239,9 @@ async def append_new_media(media_array: list, media: Message, media_type: str) -
         media_array.append(media.document.file_id)
 
 
-async def publish_channel_media(state: FSMContext, data: dict, channel_id: int, bot: Bot):
+async def publish_channel_media(state: FSMContext, data: dict, channel_id: int, bot: Bot, is_template: bool = False):
     _InputMedia = InputMediaPhoto if data['media_type'] == ContentType.PHOTO else InputMediaDocument
-    media_group = MediaGroup([_InputMedia(file_id) for file_id in data['media']])
+    media_group = MediaGroup([_InputMedia(InputFile(file_id) if is_template else file_id) for file_id in data['media']])
     media_group_msg = await bot.send_media_group(channel_id, media_group)
     media_group_url = media_group_msg[-1].url
     media_group_id = media_group_msg[-1].message_id

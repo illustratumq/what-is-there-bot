@@ -4,7 +4,7 @@ from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, UserTypeEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
@@ -117,8 +117,12 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
     # await userbot.clean_chat_history(chat_id=deal.chat_id)
     try:
-        for user_id in deal.participants:
-            await bot.kick_chat_member(deal.chat_id, user_id=user_id)
+        for user_id in await userbot.get_chat_members(deal.chat_id):
+            user = await user_db.get_user(user_id)
+            if user.type == UserTypeEnum.MODERATOR:
+                await userbot.kick_chat_member(deal.chat_id, user_id)
+            elif user_id in deal.participants:
+                await bot.kick_chat_member(deal.chat_id, user_id=user_id)
     except:
         pass
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
@@ -184,8 +188,12 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
         # await userbot.clean_chat_history(chat_id=call.message.chat.id)
         try:
-            for user_id in deal.participants:
-                await call.message.chat.kick(user_id=user_id)
+            for user_id in await userbot.get_chat_members(deal.chat_id):
+                user = await user_db.get_user(user_id)
+                if user.type == UserTypeEnum.MODERATOR:
+                    await userbot.kick_chat_member(deal.chat_id, user_id)
+                elif user_id in deal.participants:
+                    await call.bot.kick_chat_member(call.message.chat.id, user_id=user_id)
         except:
             pass
 
@@ -256,8 +264,8 @@ def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
         handle_confirm_cancel_deal, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='conf_cancel_deal'),
         state='conf_cancel_deal')
-    dp.register_message_handler(
-        left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
+    # dp.register_message_handler(
+    #     left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
     dp.register_callback_query_handler(
         cancel_action_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='back'), state='*')
 

@@ -7,7 +7,7 @@ async def set_new_room_commands(bot: Bot, chat_id: int, admin_id: int) -> None:
         BotCommand('menu', 'Показати меню'),
     ]
     admin_commands = [
-        BotCommand('admin_stop', 'Примусово завершити замовлення'),
+        BotCommand('admin', 'Перейти до адмін панелі'),
         *default_commands,
     ]
     await bot.set_my_commands(

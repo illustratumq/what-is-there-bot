@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from pyrogram import Client
 from pyrogram.errors import ChatIdInvalid
 from pyrogram.raw.core import TLObject
@@ -5,6 +7,7 @@ from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
 from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
 
 from app.config import UserBot
+from app.misc.times import now
 
 
 class UserbotController:
@@ -36,19 +39,20 @@ class UserbotController:
                 members.append(member.user.id)
         return members
 
-    async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink]:
+    async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink, str]:
         async with self._client as client:
-            chat = await self._create_group(client, last_room_number)
+            chat, room_name = await self._create_group(client, last_room_number)
             await self._set_chat_photo(chat)
             await self._set_chat_permissions(client, chat)
             await self._set_bot_admin(client, chat)
             invite_link = await self._create_invite_link(client, chat)
-        return chat, invite_link
+        return chat, invite_link, room_name
 
-    async def _create_group(self, client: Client, last_room_number: int) -> Chat:
+    async def _create_group(self, client: Client, last_room_number: int) -> tuple[Chat, str]:
         new_room_number = last_room_number + 1
-        group = await client.create_group(f'Чат №{new_room_number}', [self._bot_username])
-        return group
+        name = f'Чат №{new_room_number}'
+        group = await client.create_group(name, [self._bot_username])
+        return group, name
 
     @staticmethod
     async def _set_chat_permissions(client: Client, chat: Chat) -> None:
@@ -79,6 +83,16 @@ class UserbotController:
         except ChatIdInvalid:
             raw.chat_id = -chat.id
             await self._invoke(client, raw)
+
+    async def add_chat_member(self, chat_id: int, user_id: int):
+        async with self._client as client:
+            client: Client
+            await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
+
+    async def kick_chat_member(self, chat_id: int, user_id: int):
+        async with self._client as client:
+            client: Client
+            await client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=now() + timedelta(seconds=5))
 
     async def _delete_group(self, client: Client, chat: Chat) -> None:
         raw = DeleteChat(chat_id=chat.id)

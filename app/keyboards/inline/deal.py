@@ -1,7 +1,10 @@
-from app.database.models import Deal
+from aiogram.utils.deep_linking import get_start_link
+
+from app.database.models import Deal, User
 from app.keyboards.inline.base import *
 
 deal_cb = CallbackData('dl', 'deal_id', 'executor_id', 'action')
+add_chat_cb = CallbackData('ad_cht', 'admin_id', 'deal_id', 'action')
 comment_cb = CallbackData('cm', 'original_id', 'deal_id', 'executor_id', 'action', 'sort')
 
 
@@ -79,6 +82,19 @@ def pagination_deal_kb(executor_id: int, deals_id: list[int], current_deal_id: i
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
+def add_admin_chat_kb(deal: Deal, user: User):
+
+    def button_cb(action: str):
+        return dict(callback_data=add_chat_cb.new(deal_id=deal.deal_id, admin_id=user.user_id, action=action))
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.deal.admin.enter_chat, **button_cb('enter')),
+         InlineKeyboardButton(Buttons.deal.admin.refuse_chat, **button_cb('refuse'))]
+    ]
+
+    return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
+
+
 def join_room_kb(invite_link: str):
     return InlineKeyboardMarkup(
         row_width=1,
@@ -88,10 +104,21 @@ def join_room_kb(invite_link: str):
     )
 
 
-def to_bot_kb(url: str = None):
+def to_bot_kb(url: str):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[
             [InlineKeyboardButton('Перейти до оплати', url=url)]
         ]
     )
+
+
+async def help_admin_kb(deal_id: int):
+    url = await get_start_link(f'helpdeal-{deal_id}')
+    return InlineKeyboardMarkup(
+        row_width=1,
+        inline_keyboard=[
+            [InlineKeyboardButton('Модерувати угоду', url=url)]
+        ]
+    )
+

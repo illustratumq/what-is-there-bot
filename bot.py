@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 async def set_bot_commands(bot: Bot) -> None:
     await bot.set_my_commands(
         [
-            BotCommand('start', '[Ре]Старт боту'),
+            BotCommand('menu', 'Меню боту'),
         ]
     )
     log.info("Установка комманд пройшла успішно")

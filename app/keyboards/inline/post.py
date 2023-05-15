@@ -27,18 +27,20 @@ def construct_posts_list_kb(posts: list[Post]):
     )
 
 
-def moderate_post_kb(post: Post):
+def moderate_post_kb(post: Post, edit: bool = True):
 
     def button_cb(action: str):
         return dict(callback_data=post_cb.new(post_id=post.post_id, action=action))
 
     inline_keyboard = [
-        [
-            InlineKeyboardButton(Buttons.post.update, **button_cb('update')),
-            InlineKeyboardButton(Buttons.post.delete, **button_cb('delete'))
-        ],
         [InlineKeyboardButton(Buttons.post.back, callback_data=post_cb.new(post_id=post.post_id, action='back_list'))]
     ]
+
+    if edit:
+        inline_keyboard.insert(0, [
+            InlineKeyboardButton(Buttons.post.update, **button_cb('update')),
+            InlineKeyboardButton(Buttons.post.delete, **button_cb('delete'))
+        ])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard, row_width=2)
 

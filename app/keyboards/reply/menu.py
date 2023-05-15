@@ -3,9 +3,10 @@ from app.keyboards.reply.base import *
 
 def menu_kb(admin: bool = False):
     keyboard = [
-        [KeyboardButton(Buttons.menu.new_post), KeyboardButton(Buttons.menu.my_posts)],
-        [KeyboardButton(Buttons.menu.my_chats), KeyboardButton(Buttons.menu.my_money)],
-        [KeyboardButton(Buttons.menu.my_rating), KeyboardButton(Buttons.menu.notifications)]
+        [KeyboardButton(Buttons.menu.new_post), KeyboardButton(Buttons.menu.new_deal)],
+        [KeyboardButton(Buttons.menu.my_posts), KeyboardButton(Buttons.menu.my_money)],
+        [KeyboardButton(Buttons.menu.my_rating), KeyboardButton(Buttons.menu.my_chats)],
+        [KeyboardButton(Buttons.menu.notifications)]
     ]
     return ReplyKeyboardMarkup(
         row_width=2,
