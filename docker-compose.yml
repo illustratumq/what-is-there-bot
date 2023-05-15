@@ -7,9 +7,7 @@ services:
       context: .
     stop_signal: SIGINT
     volumes:
-    - ./app/instagram/download:/src/app/instagram/download
-    - ./app/instagram/cookies:/src/app/instagram/cookies
-    - ./app/instagram/screenshots:/src/app/instagram/screenshots
+    - ./app:/src/app
     command: python -O bot.py
     restart: unless-stopped
     env_file:
@@ -20,7 +18,6 @@ services:
     depends_on:
       - database
       - redis
-      - selenoid
     networks:
       - botnet
 
@@ -65,21 +62,6 @@ services:
         max-file: "10"
     networks:
       - botnet
-
-  selenoid:
-    image: aerokube/selenoid:latest-release
-    networks:
-      - botnet
-    ports:
-      - "4444-4448:4444"
-    restart: always
-    volumes:
-      - "./selenoid:/src/selenoid"
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./selenoid/video:/src/selenoid/video"
-      - "./selenoid/logs:/src/selenoid/logs"
-    command: [ "-conf", "/src/selenoid/browsers.json", "-video-output-dir",
-               "/opt/selenoid/video", "-log-output-dir", "/opt/selenoid/logs", "-container-network", "botnet" ]
 
 
 networks:
