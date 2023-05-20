@@ -1,7 +1,9 @@
-from app.database.models import Deal
+from app.database.models import Deal, Setting
+from app.keyboards.inline.back import back_bt
 from app.keyboards.inline.base import *
 
 admin_room_cb = CallbackData('adr', 'deal_id', 'action')
+user_setting_cb = CallbackData('ust', 'deal_id', 'user_id', 'action')
 
 
 def admin_command_kb(deal: Deal):
@@ -12,9 +14,8 @@ def admin_command_kb(deal: Deal):
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.deal.admin.done_deal, **button_cb('done_deal')),
          InlineKeyboardButton(Buttons.deal.admin.cancel_deal, **button_cb('cancel_deal'))],
-        [InlineKeyboardButton(Buttons.deal.admin.restrict_user, **button_cb('restrict_user')),
-         InlineKeyboardButton(Buttons.deal.admin.ban_user, **button_cb('ban_user'))],
-        [InlineKeyboardButton(Buttons.deal.admin.close, **button_cb('close'))]
+        [InlineKeyboardButton(Buttons.deal.admin.restrict_user, **button_cb('restrict_user'))],
+        # [InlineKeyboardButton(Buttons.deal.admin.close, **button_cb('close'))]
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
@@ -30,3 +31,43 @@ def admin_confirm_kb(deal: Deal, action: str):
     ]
 
     return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)
+
+
+def admin_choose_user_kb(deal: Deal):
+
+    def button_cb(action: str):
+        return dict(callback_data=admin_room_cb.new(deal_id=deal.deal_id, action=action))
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.deal.admin.customer, **button_cb('restrict_customer')),
+         InlineKeyboardButton(Buttons.deal.admin.executor, **button_cb('restrict_executor'))],
+        [back_bt(to='help_admin', deal_id=deal.deal_id)]
+    ]
+
+    return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
+
+
+def user_setting_kb(deal: Deal, setting: Setting):
+
+    def button_cb(action: str):
+        return dict(callback_data=user_setting_cb.new(deal_id=deal.deal_id, action=action, user_id=setting.user_id))
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.deal.admin.ban_user, **button_cb('ban_user'))],
+        [
+            InlineKeyboardButton(setting.format('Може бути замовником', setting.can_be_customer),
+                                 **button_cb('can_be_customer')),
+            InlineKeyboardButton(setting.format('Може бути виконавцем', setting.can_be_executor),
+                                 **button_cb('can_be_executor'))
+        ],
+        [
+            InlineKeyboardButton(setting.format('Може публікувати пости', setting.can_publish_post),
+                                 **button_cb('can_publish_post')),
+            InlineKeyboardButton(setting.format('Перевіряти пости', setting.need_check_post),
+                                 **button_cb('need_check_post'))
+        ],
+        [back_bt(to='select_user', deal_id=deal.deal_id)]
+
+    ]
+
+    return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)

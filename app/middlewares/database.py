@@ -21,6 +21,8 @@ class DatabaseMiddleware(LifetimeControllerMiddleware):
         data['deal_db'] = DealRepo(session)
         data['room_db'] = RoomRepo(session)
         data['post_db'] = PostRepo(session)
+        data['setting_db'] = SettingRepo(session)
+        data['commission_db'] = CommissionRepo(session)
         data['marker_db'] = MarkerRepo(session)
         data['session_pool'] = self.session_pool
         data['session'] = session

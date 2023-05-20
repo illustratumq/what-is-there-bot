@@ -1,11 +1,16 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import Message, ChatType
+from aiogram.types import Message, ChatType, CallbackQuery
+from aiogram.utils.callback_data import CallbackData
 
-from app.database.services.repos import UserRepo, DealRepo
+from app.database.services.repos import UserRepo, DealRepo, PostRepo
 from app.keyboards import Buttons
+from app.keyboards.inline.deal import pagination_deal_kb
 from app.keyboards.reply.menu import basic_kb
 from app.states.states import UserAboutSG
+
+
+MAX_CHAR_IN_MESSAGE = 4096
 
 
 async def my_rating_cmd(msg: Message, user_db: UserRepo, deal_db: DealRepo):

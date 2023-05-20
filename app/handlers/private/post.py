@@ -1,35 +1,43 @@
 import os
 from contextlib import suppress
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter, MediaGroupFilter
-from aiogram.types import Message, ChatType, ContentType, InputMediaPhoto, InputMediaDocument, MediaGroup, ContentTypes, \
-    InputFile
+from aiogram.types import Message, ChatType, ContentType, InputMediaPhoto, InputMediaDocument, MediaGroup, \
+    ContentTypes, InputFile
 from aiogram.utils.markdown import hide_link
+from apscheduler_di import ContextSchedulerDecorator
 
 from app.config import Config
-from app.database.services.enums import PostStatusText
-from app.database.services.repos import PostRepo, DealRepo
+from app.database.services.enums import PostStatusText, DealStatusEnum
+from app.database.services.repos import PostRepo, DealRepo, CommissionRepo, UserRepo, SettingRepo, MarkerRepo
+from app.handlers.admin.post import publish_post_base_channel
 from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
+from app.keyboards.inline.post import participate_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
 from app.misc.media_template import make_media_template
-from app.misc.pirce import PriceList
-from app.misc.times import now
+from app.misc.times import localize, now, next_run_time
 from app.states.states import PostSG
 
 cancel_kb = basic_kb([Buttons.action.cancel])
 
 
-async def new_post_title(msg: Message, state: FSMContext):
-    text = (
-        'Напишіть назву предмету або що потрібно зробити'
-    )
-    message = await msg.answer(text, reply_markup=cancel_kb)
-    await state.update_data(last_msg_id=message.message_id, template_media_file=None)
-    await PostSG.Title.set()
+async def new_post_title(msg: Message, state: FSMContext, setting_db: SettingRepo):
+
+    setting = await setting_db.get_setting(msg.from_user.id)
+    if not setting.can_publish_post:
+        await msg.delete()
+        await msg.answer('Адміністрація сервісу заборонила вам публікувати пости')
+    elif not setting.can_be_customer:
+        await msg.delete()
+        await msg.answer('Адміністрація сервісу заборонила вам бути Замовником')
+    else:
+        message = await msg.answer('Напишіть назву предмету або що потрібно зробити', reply_markup=cancel_kb)
+        await state.update_data(last_msg_id=message.message_id, template_media_file=None)
+        await PostSG.Title.set()
 
 
 async def new_post_about(msg: Message, state: FSMContext):
@@ -61,10 +69,12 @@ async def new_post_price(msg: Message, state: FSMContext):
     await state.update_data(**data)
 
 
-async def new_post_media(msg: Message, state: FSMContext):
+async def new_post_media(msg: Message, state: FSMContext, user_db: UserRepo, commission_db: CommissionRepo):
     await clear_last_message(await state.get_data(), msg)
     data = {}
-    if not check_is_price_ok(msg.text, data):
+    user = await user_db.get_user(msg.from_user.id)
+    commission = await commission_db.get_commission(user.commission_id)
+    if not check_is_price_ok(msg.text, data, commission):
         message = await msg.answer('Ваша ціна за завдання має бути від 10 до 10000', reply_markup=cancel_kb)
         await state.update_data(last_msg_id=message.message_id)
         return
@@ -97,7 +107,7 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
     is_template_photo = False
     if not data['media']:
         is_template_photo = True
-        media_file = make_media_template(data['title'], data['about'])
+        media_file = make_media_template(data['title'], data['about'], data['price'])
         data['media'] = [media_file]
         data['media_type'] = ContentType.PHOTO
         await state.update_data(template_media_file=media_file)
@@ -114,7 +124,7 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
     await PostSG.Confirm.set()
 
 
-async def edit_new_post_data(msg: Message, state: FSMContext):
+async def edit_new_post_data(msg: Message, state: FSMContext, user_db: UserRepo, commission_db: CommissionRepo):
     data = await state.get_data()
     post_message_id = data['post_message_id']
     edited_message_id = msg.message_id
@@ -128,7 +138,9 @@ async def edit_new_post_data(msg: Message, state: FSMContext):
             await msg.answer(f'Ваш опис завдання повинен містити від 10 до 500 символів (зараз {len(msg.text)})')
             return
     elif data['price_message_id'] == edited_message_id:
-        if not check_is_price_ok(msg.text, edited_data):
+        user = await user_db.get_user(msg.from_user.id)
+        commission = await commission_db.get_commission(user.commission_id)
+        if not check_is_price_ok(msg.text, edited_data, commission):
             await msg.answer('Ваша ціна за завдання має бути від 10 до 10000')
     else:
         return
@@ -139,25 +151,66 @@ async def edit_new_post_data(msg: Message, state: FSMContext):
     )
 
 
-async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, deal_db: DealRepo, config: Config):
+async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, deal_db: DealRepo,
+                           setting_db: SettingRepo, user_db: UserRepo, config: Config,
+                           scheduler: ContextSchedulerDecorator, marker_db: MarkerRepo):
     data = await state.get_data()
-    post = await post_db.add(
-        title=data['title'], about=data['about'], price=data['price'],
-        media_id=data['media_id'], media_url=data['media_url'], user_id=msg.from_user.id,
-    )
-    deal = await deal_db.add(
-        post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
-    )
-    message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
-                                         reply_markup=moderate_post_kb(post))
-    await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
+    setting = await setting_db.get_setting(msg.from_user.id)
+    user = await user_db.get_user(msg.from_user.id)
+
+    if not setting.can_publish_post:
+        await msg.answer('Адміністрація сервісу заборонила вам публікувати пости')
+        return
+
+    post = await post_db.add(title=data['title'], about=data['about'], price=data['price'], media_id=data['media_id'],
+                             media_url=data['media_url'], user_id=msg.from_user.id,)
+    deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price)
+
+    if await need_check_post_filter(user, post, setting_db, deal_db):
+        message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
+                                             reply_markup=moderate_post_kb(post))
+        await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
+        await msg.answer('Ваш пост відправлений на модерацію 👌', reply_markup=menu_kb())
+    else:
+        await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
+        message = await msg.bot.send_message(
+            config.misc.reserv_channel_id, post.construct_post_text(),
+            reply_markup=participate_kb(await post.construct_participate_link()),
+            disable_web_page_preview=True if not post.media_id else False
+        )
+        await post_db.update_post(post.post_id, reserv_message_id=message.message_id)
+        await deal_db.update_deal(post.deal_id, status=DealStatusEnum.ACTIVE)
+        scheduler.add_job(
+            publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
+            kwargs=dict(post=post, bot=msg.bot, post_db=post_db, marker_db=marker_db, user_db=user_db),
+            name=f'Публікація поста #{post.post_id} на основному каналі'
+        )
+        await msg.answer('Ваш пост скоро опублікується 👌', reply_markup=menu_kb())
+
     if data['template_media_file']:
         os.remove(data['template_media_file'])
-    text = (
-        'Ваш пост відправлений на модерацію 👌'
-    )
-    await msg.answer(text, reply_markup=menu_kb())
     await state.finish()
+
+
+async def need_check_post_filter(user: UserRepo.model, post: PostRepo.model, setting_db: SettingRepo, deal_db: DealRepo):
+    check = False
+    if now() - localize(user.created_at) < timedelta(days=3):
+        check = True
+    elif len(await deal_db.get_deal_customer(user.user_id, status=DealStatusEnum.DONE)) < 3:
+        check = True
+    if is_banned_words_exist(post):
+        check = True
+    await setting_db.update_setting(user.user_id, need_check_post=check)
+    return check
+
+BANNED_WORD_LIST = ['яблоко', 'казино']
+
+
+def is_banned_words_exist(post: PostRepo.model):
+    for text in [post.title, post.about]:
+        for word in text.split(' '):
+            if word.lower() in BANNED_WORD_LIST:
+                return True
 
 
 def setup(dp: Dispatcher):
@@ -208,14 +261,13 @@ async def check_is_about_ok(msg: Message, data: dict) -> bool:
         return True
 
 
-def check_is_price_ok(price: str, data: dict) -> bool:
+def check_is_price_ok(price: str, data: dict, commission: CommissionRepo.model) -> bool:
     if price == Buttons.post.contract:
         data.update({'price': 0})
         return True
     elif price.isnumeric():
         price = int(price)
-        price_list = PriceList.current()
-        if price_list.minimal_price <= price <= price_list.maximal_price or price == 0:
+        if commission.minimal <= price <= commission.maximal or price == 0:
             data.update({'price': price})
             return True
     else:

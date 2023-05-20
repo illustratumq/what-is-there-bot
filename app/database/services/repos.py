@@ -1,7 +1,9 @@
+from sqlalchemy import select, cast
+from sqlalchemy.orm import joinedload
+
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum
-from app.misc.times import now
 
 
 class UserRepo(BaseRepo[User]):
@@ -112,3 +114,29 @@ class MarkerRepo(BaseRepo[Marker]):
 
     async def delete_marker(self, user_id: int, text: str):
         return await self.delete(self.model.text == text, self.model.user_id == user_id)
+
+
+class SettingRepo(BaseRepo[Setting]):
+    model = Setting
+
+    async def get_setting(self, user_id: int) -> Setting:
+        return await self.get_one(self.model.user_id == user_id)
+
+    async def update_setting(self, user_id: int, **kwargs) -> None:
+        return await self.update(self.model.user_id == user_id, **kwargs)
+
+    async def delete_setting(self, user_id: int):
+        return await self.delete(self.model.user_id == user_id)
+
+
+class CommissionRepo(BaseRepo[Commission]):
+    model = Commission
+
+    async def get_commission(self, pack_id: int) -> Commission:
+        return await self.get_one(self.model.pack_id == pack_id)
+
+    async def update_commission(self, pack_id: int, **kwargs) -> None:
+        return await self.update(self.model.pack_id == pack_id, **kwargs)
+
+    async def delete_commission(self, pack_id: int):
+        return await self.delete(self.model.pack_id == pack_id)

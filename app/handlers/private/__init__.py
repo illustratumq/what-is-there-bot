@@ -11,6 +11,7 @@ from app.handlers.private import my_rating
 from app.handlers.private import my_balance
 from app.handlers.private import pay
 from app.handlers.private import evaluate
+from app.handlers.private import back
 
 
 def setup(dp: Dispatcher):
@@ -25,3 +26,4 @@ def setup(dp: Dispatcher):
     my_rating.setup(dp)
     my_balance.setup(dp)
     evaluate.setup(dp)
+    back.setup(dp)

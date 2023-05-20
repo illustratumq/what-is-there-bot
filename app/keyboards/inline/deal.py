@@ -82,15 +82,17 @@ def pagination_deal_kb(executor_id: int, deals_id: list[int], current_deal_id: i
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def add_admin_chat_kb(deal: Deal, user: User):
+def add_admin_chat_kb(deal: Deal, user: User, only_refuse: bool = False):
 
     def button_cb(action: str):
         return dict(callback_data=add_chat_cb.new(deal_id=deal.deal_id, admin_id=user.user_id, action=action))
 
     inline_keyboard = [
-        [InlineKeyboardButton(Buttons.deal.admin.enter_chat, **button_cb('enter')),
-         InlineKeyboardButton(Buttons.deal.admin.refuse_chat, **button_cb('refuse'))]
+        [InlineKeyboardButton(Buttons.deal.admin.refuse_chat, **button_cb('refuse'))]
     ]
+
+    if not only_refuse:
+        inline_keyboard[0].insert(0, InlineKeyboardButton(Buttons.deal.admin.enter_chat, **button_cb('enter')),)
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 

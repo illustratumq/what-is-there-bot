@@ -18,14 +18,29 @@ from app.states.states import ParticipateSG
 PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')
 ADMIN_HELP_REGEX = re.compile(r'helpdeal-(\d+)')
 
+greeting_text = (
+        'Цей бот дозволяє вам опублікувати та керувати постами на каналі А ШО ТАМ?\n\n'
+        'Нижче в чаті ви побачите кнопки, які дозволяють вам взаємодіяти з ботом. 👇\n\n'
+        '<b>Новий пост ➕</b> - Опублікувати новий пост на каналі.\n'
+        '<b>Мої чати 💬</b> -  Переглянути ваші активні чати.\n'
+        '<b>Мій рейтинг ⭐</b> - Переглянути ваш рейтинг у сервісі та додати опис про себе.\n'
+        '<b>Мої пости 📑</b> -  Переглянути та керувати своїми постами на каналі.\n'
+        '<b>Мої кошти 💸</b> - Перевірити ваш баланс та вивести кошти з рахунку каналу.\n'
+        '<b>Сповіщення 🔔</b> -  Налаштувати сповіщення про нові пости на каналі.\n\n'
+        'Якщо у вас є запитання щодо реклами, співпраці або будь-яких інших питань, '
+        'а також якщо у вас є ідеї щодо покращення сервісу, ви можете зв\'язатися з адміністрацією'
+        ' каналу за допомогою контакту @'
+    )
+
 
 async def start_cmd(msg: Message, state: FSMContext):
     await state.finish()
-    await msg.answer('Мої вітаннячка. Ви перейшли в головне меню.', reply_markup=menu_kb())
+    await msg.answer(greeting_text, reply_markup=menu_kb())
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
                           state: FSMContext):
+    await msg.delete()
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     if not deal:
@@ -55,6 +70,7 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
 
 async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
                          user_db: UserRepo, room_db: RoomRepo, config: Config):
+    await msg.delete()
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     if not deal.chat_id:

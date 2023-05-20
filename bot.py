@@ -13,6 +13,7 @@ from app.database.services.db_engine import create_db_engine_and_session_pool
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
+from app.misc.pirce import setup_default_commission_pack
 from app.misc.scheduler import compose_scheduler
 
 log = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ async def main():
     setup_cron_function(scheduler)
 
     await set_bot_commands(bot)
+    # await setup_default_commission_pack(sqlalchemy_session)
     # await notify_admin(bot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
 

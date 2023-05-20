@@ -6,11 +6,10 @@ from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.deep_linking import get_start_link
 
-from app.database.services.repos import DealRepo, UserRepo, PostRepo
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo
 from app.keyboards.inline.chat import room_cb, back_chat_kb
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import pay_deal_kb
-from app.misc.pirce import PriceList
 
 NEW_PRICE_REGEX = re.compile(
     r'^\d{2,5}$'
@@ -18,18 +17,18 @@ NEW_PRICE_REGEX = re.compile(
 
 
 async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
-                         user_db: UserRepo, state: FSMContext):
+                         user_db: UserRepo, commission_db: CommissionRepo, state: FSMContext):
     await call.message.delete()
     await call.answer()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
-    price_list = PriceList.current()
+    commission = await commission_db.get_commission(customer.commission_id)
     text = (
         f'Щоб встановити ціну угоди, {executor.create_html_link("Виконавець")} та '
         f'{customer.create_html_link("Замовник")} повинні відправити одне й те саме ціле число. '
-        f'Мінімальна ціна — {price_list.minimal_price} грн.\n\n'
+        f'Мінімальна ціна — {commission.minimal} грн.\n\n'
         f'ℹ В нашому сервісі встановлена комісія, з якою Ви можете ознайомитись за посиланням.'
     )
     await call.message.answer(text, disable_web_page_preview=True, reply_markup=back_chat_kb(deal))
@@ -39,14 +38,16 @@ async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: Deal
     await state.storage.update_data(chat=call.message.chat.id, user=deal.executor_id, price=0)
 
 
-async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, user_db: UserRepo):
+async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, user_db: UserRepo,
+                           commission_db: CommissionRepo):
     new_price = int(msg.text)
     deal = await deal_db.get_deal_chat(msg.chat.id)
-    price_list = PriceList.current()
-    if not price_list.minimal_price <= new_price <= price_list.maximal_price:
+    customer = await user_db.get_user(deal.customer_id)
+    commission = await commission_db.get_commission(customer.commission_id)
+    if not commission.minimal <= new_price <= commission.maximal:
         text = (
-            f'Нова ціна угоди має бути не меншою за {price_list.minimal_price} та не більшою за '
-            f'{price_list.maximal_price} грн.'
+            f'Нова ціна угоди має бути не меншою за {commission.minimal} та не більшою за '
+            f'{commission.maximal} грн.'
         )
         await msg.reply(text, reply_markup=back_chat_kb(deal))
         return
@@ -96,7 +97,7 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
 
 
 async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                       post_db: PostRepo):
+                       post_db: PostRepo, commission_db: CommissionRepo):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     if call.from_user.id == deal.executor_id:
@@ -124,7 +125,9 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
     await call.message.delete()
     await call.bot.send_message(deal.chat_id, text, reply_markup=to_bot_kb(await get_start_link('')))
     need_to_pay = deal.price - deal.payed if deal.payed < deal.price else 0
-    commission = PriceList.calculate_commission(need_to_pay)
+
+    commission = await commission_db.get_commission(customer.commission_id)
+    commission = commission.calculate_commission(need_to_pay)
     text = (
         f'Ви бажаєте оплатити угоду для вашого поста "{post.title}".\n\n'
         f'Встановлена ціна {deal.price} грн.\n'

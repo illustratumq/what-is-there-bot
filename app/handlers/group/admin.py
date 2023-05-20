@@ -4,10 +4,13 @@ from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import CallbackQuery, ChatType, Message
 
 from app.config import Config
-from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo
+from app.database.services.enums import UserStatusEnum
+from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo, CommissionRepo, SettingRepo
 from app.handlers.userbot import UserbotController
-from app.keyboards.inline.admin import admin_command_kb, admin_confirm_kb, admin_room_cb
+from app.keyboards.inline.admin import admin_command_kb, admin_confirm_kb, admin_room_cb, admin_choose_user_kb, \
+    user_setting_kb, user_setting_cb
 from app.handlers.group.cancel import cancel_deal_processing, done_deal_processing
+from app.states.states import UserBanSG
 
 
 async def admin_room_cmd(msg: Message, user_db: UserRepo, deal_db: DealRepo,
@@ -61,27 +64,37 @@ async def done_deal_confirm(call: CallbackQuery, callback_data: dict, user_db: U
 
 
 async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
-                          room_db: RoomRepo, post_db: PostRepo, state: FSMContext, userbot: UserbotController,
-                          config: Config):
+                          room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo,
+                          state: FSMContext, userbot: UserbotController, config: Config):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
     post = await post_db.get_post(deal.post_id)
     room = await room_db.get_room(deal.chat_id)
     admin = await user_db.get_user(call.from_user.id)
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
+    if deal.price == 0:
+        await call.answer('Ціна угоди ще не визначена, тому її неможливо завершити', show_alert=True)
+        return
+    elif deal.payed == 0:
+        await call.answer('Угода неоплачена, тому її неможливо завершити', show_alert=True)
+        return
+    elif deal.price > deal.payed:
+        await call.answer(f'Угода оплачена частково {deal.payed} з {deal.price}, тому її неможливо завершити',
+                          show_alert=True)
+        return
+    await done_deal_processing(call, deal, post, customer, executor, state,
+                               deal_db, post_db, user_db, room_db, commission_db, userbot, config)
     text_to_channel = (
         f'{room.construct_admin_moderate_text()}\n\n🆔 #Угода_номер_{deal.deal_id} була завершена '
         f'адміністратором {admin.full_name}'
     )
     await call.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
-    await done_deal_processing(call, deal, post, customer, executor, state,
-                               deal_db, post_db, user_db, room_db, userbot, config)
     await call.message.edit_text(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно завершена!')
 
 
 async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
-                            room_db: RoomRepo, post_db: PostRepo, state: FSMContext, userbot: UserbotController,
-                            config: Config):
+                            room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo, state: FSMContext,
+                            userbot: UserbotController, config: Config):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
     post = await post_db.get_post(deal.post_id)
     room = await room_db.get_room(deal.chat_id)
@@ -93,9 +106,95 @@ async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: U
     )
     await call.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
     await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db,
-                                 post_db, user_db, room_db, userbot, config,
-                                 message=f'Угода {post.title}, була відмінена адміністратором')
+                                 post_db, user_db, room_db, commission_db, userbot, config,
+                                 message=f'🔔 Ваша угода "{post.title}", була відмінена адміністратором')
     await call.message.edit_text(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно відмнінена!')
+
+
+async def select_user_cmd(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
+                          room_db: RoomRepo, post_db: PostRepo):
+    deal = await deal_db.get_deal(int(callback_data['deal_id']))
+    text = (
+        f'{await construct_deal_text(deal, post_db, user_db, room_db)}\n\n'
+        f'<b>Оберіть користувача, для якого треба обмежити права</b>'
+    )
+    await call.message.edit_text(text, reply_markup=admin_choose_user_kb(deal))
+
+
+async def edit_user_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
+                        setting_db: SettingRepo):
+    deal = await deal_db.get_deal(int(callback_data['deal_id']))
+    if 'user_id' in callback_data.keys():
+        user = await user_db.get_user(int(callback_data['user_id']))
+    elif callback_data['action'] == 'restrict_customer':
+        user = await user_db.get_user(deal.customer_id)
+    else:
+        user = await user_db.get_user(deal.executor_id)
+    setting = await setting_db.get_setting(user.user_id)
+    role = 'Замовник' if user.user_id == deal.customer_id else 'Виконавець'
+    text = (
+        f'Ім\'я: {user.mention} ({user.user_id})\n'
+        f'Роль в цій угоді: {role}\n'
+        f'{await user.construct_admin_info(deal_db)}'
+    )
+    await call.message.edit_text(text, reply_markup=user_setting_kb(deal, setting))
+
+
+async def edit_user_setting(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
+                            setting_db: SettingRepo, state: FSMContext):
+    user_id = int(callback_data['user_id'])
+    setting = await setting_db.get_setting(user_id)
+    if callback_data['action'] == 'ban_user':
+        await user_db.update_user(user_id, status=UserStatusEnum.BANNED, ban_comment='Причина не вказана')
+        text = (
+            'Будь-ласка, вкажіть причину, за якою '
+            'користувач був забанений (до 400 символів)'
+        )
+        message = await call.message.answer(text)
+        await state.update_data(user_id=user_id, last_msg_id=message.message_id, origin_id=call.message.message_id,
+                                deal_id=int(callback_data['deal_id']))
+        await UserBanSG.Input.set()
+    elif callback_data['action'] == 'can_be_customer':
+        await setting_db.update_setting(user_id, can_be_customer=not setting.can_be_customer)
+    elif callback_data['action'] == 'can_be_executor':
+        await setting_db.update_setting(user_id, can_be_executor=not setting.can_be_executor)
+    elif callback_data['action'] == 'can_publish_post':
+        await setting_db.update_setting(user_id, can_publish_post=not setting.can_publish_post)
+    elif callback_data['action'] == 'need_check_post':
+        await setting_db.update_setting(user_id, need_check_post=not setting.need_check_post)
+
+    await edit_user_cmd(call, callback_data, deal_db, user_db, setting_db)
+
+
+async def save_user_ban_comment(msg: Message, state: FSMContext, user_db: UserRepo, deal_db: DealRepo,
+                                setting_db: SettingRepo):
+    await msg.delete()
+    data = await state.get_data()
+
+    ban_comment = msg.html_text
+    user_id = data['user_id']
+    origin_id = data['origin_id']
+    last_msg_id = data['last_msg_id']
+
+    if len(ban_comment) > 400:
+        text = (
+            f'Будь-ласка, вкажіть причину, за якою користувач був забанений (до 400 символів)\n\n'
+            f'Ваш коментар занадто великий {len(ban_comment)}, спробуйте ще раз.'
+        )
+        message = await msg.bot.edit_message_text(text, msg.from_user.id, message_id=last_msg_id)
+        await state.update_data(last_msg_id=message.message_id)
+    else:
+        await user_db.update_user(user_id, ban_comment=ban_comment)
+        await msg.bot.delete_message(msg.from_user.id, last_msg_id)
+        user = await user_db.get_user(user_id)
+        deal = await deal_db.get_deal(data['deal_id'])
+        setting = await setting_db.get_setting(user_id)
+        text = (
+            f'Ім\'я: {user.mention} ({user.user_id})\n'
+            f'{await user.construct_admin_info(deal_db)}'
+        )
+        await msg.bot.edit_message_text(text, msg.from_user.id, origin_id, reply_markup=user_setting_kb(deal, setting))
+        await state.finish()
 
 
 def setup(dp: Dispatcher):
@@ -113,6 +212,18 @@ def setup(dp: Dispatcher):
         done_deal_confirm, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='done_deal'), state='*')
     dp.register_callback_query_handler(
         done_deal_admin, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='conf_done_deal'), state='*')
+
+    dp.register_callback_query_handler(
+        select_user_cmd, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='restrict_user'), state='*')
+    dp.register_callback_query_handler(
+        edit_user_cmd, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='restrict_customer'), state='*')
+    dp.register_callback_query_handler(
+        edit_user_cmd, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='restrict_executor'), state='*')
+
+    dp.register_callback_query_handler(
+        edit_user_setting, ChatTypeFilter(ChatType.PRIVATE), user_setting_cb.filter(), state='*')
+
+    dp.register_message_handler(save_user_ban_comment, ChatTypeFilter(ChatType.PRIVATE), state=UserBanSG.Input)
 
 
 async def construct_deal_text(deal: DealRepo.model, post_db: PostRepo, user_db: UserRepo, room_db: RoomRepo):

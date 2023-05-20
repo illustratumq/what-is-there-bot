@@ -2,18 +2,20 @@ from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType
 
-from app.database.services.repos import DealRepo, PostRepo, UserRepo
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, CommissionRepo
 from app.keyboards.inline.pay import confirm_pay_kb, pay_cb, pay_deal_kb
-from app.misc.pirce import PriceList
 
 
-async def confirm_pay_deal_from_balance(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo):
+async def confirm_pay_deal_from_balance(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
+                                        user_db: UserRepo, commission_db: CommissionRepo):
     await call.message.delete()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
     need_to_pay = deal.price - deal.payed
-    commission = PriceList.calculate_commission(need_to_pay)
+    user = await user_db.get_user(call.from_user.id)
+    commission = await commission_db.get_commission(user.commission_id)
+    commission = commission.calculate_commission(need_to_pay)
     text = (
         f'Ви бажаєте оплатити угоду "{post.title}" у розмірі {need_to_pay + commission} грн '
         f'({need_to_pay} + {commission} комісія) з вашого балансу, будь-ласка підтвердіть своє рішення.'
@@ -22,12 +24,13 @@ async def confirm_pay_deal_from_balance(call: CallbackQuery, callback_data: dict
 
 
 async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                               user_db: UserRepo):
+                               user_db: UserRepo, commission_db: CommissionRepo):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     need_to_pay = deal.price - deal.payed
     customer = await user_db.get_user(deal.customer_id)
-    commission = PriceList.calculate_commission(need_to_pay)
+    commission = await commission_db.get_commission(customer.commission_id)
+    commission = commission.calculate_commission(need_to_pay)
     if customer.balance < need_to_pay:
         await call.answer('На вашому рахунку бракує коштів', show_alert=True)
         return
@@ -53,14 +56,15 @@ async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db
 
 
 async def back_to_pay_method(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                             post_db: PostRepo):
+                             post_db: PostRepo, commission_db: CommissionRepo):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
     post = await post_db.get_post(deal.post_id)
     await call.message.delete()
-    need_to_pay = deal.price - deal.payed if deal.payed < deal.price else 0
-    commission = PriceList.calculate_commission(need_to_pay)
+    need_to_pay = deal.price - deal.payed
+    commission = await commission_db.get_commission(customer.commission_id)
+    commission = commission.calculate_commission(need_to_pay)
     text = (
         f'Ви бажаєте оплатити угоду для вашого поста "{post.title}".\n\n'
         f'Встановлена ціна {deal.price} грн.\n'

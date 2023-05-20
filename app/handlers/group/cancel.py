@@ -5,12 +5,11 @@ from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum, UserTypeEnum
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
 from app.keyboards.inline.post import participate_kb
-from app.misc.pirce import PriceList
 
 
 async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo):
@@ -80,11 +79,13 @@ async def confirm_cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal
 
 async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.model,
                                  customer: UserRepo.model, state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                                 user_db: UserRepo, room_db: RoomRepo, userbot: UserbotController, config: Config,
+                                 user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo,
+                                 userbot: UserbotController, config: Config,
                                  message: str = None, reset_state: bool = True):
     if deal.payed > 0:
         back_to_customer = deal.payed
-        commission = PriceList.calculate_commission(deal.payed)
+        commission = await commission_db.get_commission(customer.commission_id)
+        commission = await commission.calculate_commission(deal.payed)
         customer_balance = customer.balance + back_to_customer + commission
         await user_db.update_user(customer.user_id, balance=customer_balance)
         text = (
@@ -117,22 +118,27 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         await state.storage.reset_data(chat=deal.chat_id, user=deal.customer_id)
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
     # await userbot.clean_chat_history(chat_id=deal.chat_id)
-    try:
-        for user_id in await userbot.get_chat_members(deal.chat_id):
+
+    room = await room_db.get_room(deal.chat_id)
+    users = deal.participants
+    if room.admin_id:
+        users.append(room.admin_id)
+    for user_id in users:
+        try:
             user = await user_db.get_user(user_id)
             if user.type == UserTypeEnum.MODERATOR:
                 await userbot.kick_chat_member(deal.chat_id, user_id)
-            elif user_id in deal.participants:
-                await bot.kick_chat_member(deal.chat_id, user_id=user_id)
-    except:
-        pass
+        except:
+            await bot.kick_chat_member(deal.chat_id, user_id=user_id)
+
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
 
 async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: PostRepo.model, customer: UserRepo.model,
                                executor: UserRepo.model,  state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                               user_db: UserRepo, room_db: RoomRepo, userbot: UserbotController, config: Config):
+                               user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo,
+                               userbot: UserbotController, config: Config):
     await call.message.delete_reply_markup()
     if deal.price == 0:
         text = (
@@ -154,7 +160,8 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await call.message.answer(text)
         return
     else:
-        commission = PriceList.calculate_commission(deal.price)
+        commission = await commission_db.get_commission(customer.commission_id)
+        commission = commission.calculate_commission(deal.price)
         balance = executor.balance + deal.price - commission
         await user_db.update_user(executor.user_id, balance=balance)
         text = (
@@ -171,6 +178,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
                 f'На ваш рахунок повернено {back_to_customer} грн.'
             )
             await call.bot.send_message(deal.customer_id, text)
+        room = await room_db.get_room(deal.chat_id)
         text = (
             f'Угода "{post.title}" була завершена. Оцініть роботу виконавця від 1 до 5.'
         )
@@ -189,20 +197,22 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
         # await userbot.clean_chat_history(chat_id=call.message.chat.id)
-        try:
-            for user_id in await userbot.get_chat_members(deal.chat_id):
+
+        users = deal.participants
+        if room.admin_id:
+            users.append(room.admin_id)
+        for user_id in await users:
+            try:
                 user = await user_db.get_user(user_id)
                 if user.type == UserTypeEnum.MODERATOR:
                     await userbot.kick_chat_member(deal.chat_id, user_id)
-                elif user_id in deal.participants:
-                    await call.bot.kick_chat_member(call.message.chat.id, user_id=user_id)
-        except:
-            pass
+            except:
+                await call.bot.kick_chat_member(call.message.chat.id, user_id=user_id)
 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
-                                   config: Config):
+                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo,
+                                   commission_db: CommissionRepo, userbot: UserbotController, config: Config):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
@@ -213,15 +223,15 @@ async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, dea
     if customer_data['voted'] and executor_data['voted']:
         post = await post_db.get_post(deal.post_id)
         await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db, room_db,
-                                   userbot, config)
+                                   commission_db, userbot, config)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')
 
 
 async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                     post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
-                                     config: Config):
+                                     post_db: PostRepo, state: FSMContext, room_db: RoomRepo,
+                                     commission_db: CommissionRepo, userbot: UserbotController, config: Config):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
@@ -233,7 +243,7 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
         post = await post_db.get_post(deal.post_id)
         await call.message.delete_reply_markup()
         await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                     userbot, config)
+                                     commission_db, userbot, config)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')
@@ -241,7 +251,7 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
 
 async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: UserRepo,
                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
-                                  config: Config):
+                                  commission_db: CommissionRepo, config: Config):
     deal = await deal_db.get_deal_chat(msg.chat.id)
     if deal:
         customer = await user_db.get_user(deal.customer_id)
@@ -251,7 +261,7 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
             f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
         )
         await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                     userbot, config, message=text)
+                                     commission_db, userbot, config, message=text)
 
 
 def setup(dp: Dispatcher):
@@ -271,5 +281,3 @@ def setup(dp: Dispatcher):
         left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
     dp.register_callback_query_handler(
         cancel_action_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='back'), state='*')
-
-

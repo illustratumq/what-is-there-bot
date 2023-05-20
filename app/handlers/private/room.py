@@ -55,7 +55,6 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
 
 async def refuse_admin_enter_chat(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, room_db: RoomRepo,
                                   config: Config):
-    await call.message.delete_reply_markup()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     room = await room_db.get_room(deal.chat_id)
@@ -63,7 +62,8 @@ async def refuse_admin_enter_chat(call: CallbackQuery, callback_data: dict, deal
     message = await call.bot.send_message(config.misc.admin_channel_id, room.construct_admin_moderate_text(),
                                           reply_markup=await help_admin_kb(deal.deal_id))
     await room_db.update_room(room.chat_id, admin_id=None, message_id=message.message_id)
-    await call.message.answer('Ви відмолвились від модерування цього чату. Повідомлення оновлено в каналі')
+    await call.answer('Ви відмовились від модерування цього чату. Повідомлення оновлено в каналі', show_alert=True)
+    await call.message.delete()
 
 
 def setup(dp: Dispatcher):

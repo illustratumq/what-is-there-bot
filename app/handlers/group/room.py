@@ -10,7 +10,7 @@ from app.database.models import Deal
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import room_menu_kb, room_cb
-from app.keyboards.inline.deal import help_admin_kb, add_chat_cb
+from app.keyboards.inline.deal import help_admin_kb, add_chat_cb, add_admin_chat_kb
 from app.misc.commands import set_new_room_commands
 
 
@@ -33,10 +33,12 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
 
 
 async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, room_db: RoomRepo,
-                                userbot: UserbotController):
+                                user_db: UserRepo, userbot: UserbotController):
     deal_id = int(callback_data['deal_id'])
     admin_id = int(callback_data['admin_id'])
     deal = await deal_db.get_deal(deal_id)
+    admin = await user_db.get_user(call.from_user.id)
+    reply_markup = add_admin_chat_kb(deal, admin, only_refuse=True)
     try:
         await userbot.add_chat_member(deal.chat_id, admin_id)
     except UserAlreadyParticipant:
@@ -44,6 +46,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
         await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True)
     except Exception as Error:
         await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина:\n\n{Error}')
+    await call.message.edit_reply_markup(reply_markup=reply_markup)
     await set_new_room_commands(call.bot, deal.chat_id, admin_id)
     await deal_db.update_deal(deal.deal_id, next_activity_date=None)
 

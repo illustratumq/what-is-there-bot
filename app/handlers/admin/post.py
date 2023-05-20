@@ -174,7 +174,7 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     await deal_db.update_deal(post.deal_id, status=DealStatusEnum.ACTIVE)
     scheduler.add_job(
         publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
-        kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db),
+        kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db, user_db=user_db),
         name=f'Публікація поста #{post.post_id} на основному каналі'
     )
     admin_channel_text = (
@@ -187,7 +187,8 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
                                      disable_web_page_preview=False if post.media_url else True)
 
 
-async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, config: Config):
+async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, user_db: UserRepo,
+                                    config: Config):
     post = await post_db.get_post(post.post_id)
     reply_markup = participate_kb(await post.construct_participate_link()) if post.status == DealStatusEnum.ACTIVE else None
     message = await bot.send_message(
@@ -196,17 +197,21 @@ async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, mar
     )
     await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
     await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
-    await markers_post_processing(marker_db, post, bot, message.url)
+    await markers_post_processing(marker_db, post, bot, message.url, user_db)
 
 
-async def markers_post_processing(marker_db: MarkerRepo, post: Post, bot: Bot, url: str):
+async def markers_post_processing(marker_db: MarkerRepo, post: Post, bot: Bot, url: str, user_db: UserRepo):
     markers = await marker_db.get_markers_title(post.title)
     for marker in markers:
         try:
-            await bot.send_message(
-                marker.user_id,
-                text=f'На каналі з\'явився пост по вашій підписці "{marker.text}"{hide_link(url)}'
-            )
+            user = await user_db.get_user(marker.user_id)
+            start = int(user.time.split('-')[0])
+            end = int(user.time.split('-')[1])
+            if start < int(now().strftime('%H')) <= end:
+                await bot.send_message(
+                    marker.user_id,
+                    text=f'На каналі з\'явився пост по вашій підписці "{marker.text}"{hide_link(url)}'
+                )
         except:
             pass
 

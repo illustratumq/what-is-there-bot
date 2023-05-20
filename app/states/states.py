@@ -24,3 +24,11 @@ class CommentSG(StatesGroup):
 
 class UserAboutSG(StatesGroup):
     Input = State()
+
+
+class UserBanSG(StatesGroup):
+    Input = State()
+
+
+class UserTimeSG(StatesGroup):
+    Input = State()
