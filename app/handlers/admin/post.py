@@ -3,6 +3,7 @@ from datetime import timedelta
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
+from aiogram.utils.deep_linking import get_start_link
 from aiogram.utils.markdown import hide_link
 from apscheduler_di import ContextSchedulerDecorator
 
@@ -195,6 +196,7 @@ async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, mar
         config.misc.post_channel_chat_id, post.construct_post_text(),
         reply_markup=reply_markup, disable_web_page_preview=True if not post.media_id else False
     )
+    await get_start_link('post-1')
     await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
     await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
     await markers_post_processing(marker_db, post, bot, message.url, user_db)

@@ -18,7 +18,7 @@ from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
 from app.keyboards.inline.post import participate_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
-from app.misc.media_template import make_media_template
+from app.misc.media_template import make_post_media_template
 from app.misc.times import localize, now, next_run_time
 from app.states.states import PostSG
 
@@ -26,7 +26,6 @@ cancel_kb = basic_kb([Buttons.action.cancel])
 
 
 async def new_post_title(msg: Message, state: FSMContext, setting_db: SettingRepo):
-
     setting = await setting_db.get_setting(msg.from_user.id)
     if not setting.can_publish_post:
         await msg.delete()
@@ -75,7 +74,8 @@ async def new_post_media(msg: Message, state: FSMContext, user_db: UserRepo, com
     user = await user_db.get_user(msg.from_user.id)
     commission = await commission_db.get_commission(user.commission_id)
     if not check_is_price_ok(msg.text, data, commission):
-        message = await msg.answer('Ваша ціна за завдання має бути від 10 до 10000', reply_markup=cancel_kb)
+        message = await msg.answer(f'Ваша ціна за завдання має бути від {commission.minimal} до {commission.maximal}',
+                                   reply_markup=cancel_kb)
         await state.update_data(last_msg_id=message.message_id)
         return
     text = (
@@ -107,7 +107,7 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
     is_template_photo = False
     if not data['media']:
         is_template_photo = True
-        media_file = make_media_template(data['title'], data['about'], data['price'])
+        media_file = make_post_media_template(data['title'], data['about'], data['price'])
         data['media'] = [media_file]
         data['media_type'] = ContentType.PHOTO
         await state.update_data(template_media_file=media_file)
@@ -141,7 +141,7 @@ async def edit_new_post_data(msg: Message, state: FSMContext, user_db: UserRepo,
         user = await user_db.get_user(msg.from_user.id)
         commission = await commission_db.get_commission(user.commission_id)
         if not check_is_price_ok(msg.text, edited_data, commission):
-            await msg.answer('Ваша ціна за завдання має бути від 10 до 10000')
+            await msg.answer(f'Ваша ціна за завдання має бути від {commission.minimal} до {commission.maximal}')
     else:
         return
     data.update(edited_data)
@@ -166,7 +166,7 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
                              media_url=data['media_url'], user_id=msg.from_user.id,)
     deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price)
 
-    if await need_check_post_filter(user, post, setting_db, deal_db):
+    if setting.need_check_post or await need_check_post_filter(user, post, deal_db):
         message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
                                              reply_markup=moderate_post_kb(post))
         await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
@@ -192,7 +192,7 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
     await state.finish()
 
 
-async def need_check_post_filter(user: UserRepo.model, post: PostRepo.model, setting_db: SettingRepo, deal_db: DealRepo):
+async def need_check_post_filter(user: UserRepo.model, post: PostRepo.model, deal_db: DealRepo):
     check = False
     if now() - localize(user.created_at) < timedelta(days=3):
         check = True
@@ -200,7 +200,6 @@ async def need_check_post_filter(user: UserRepo.model, post: PostRepo.model, set
         check = True
     if is_banned_words_exist(post):
         check = True
-    await setting_db.update_setting(user.user_id, need_check_post=check)
     return check
 
 BANNED_WORD_LIST = ['яблоко', 'казино']

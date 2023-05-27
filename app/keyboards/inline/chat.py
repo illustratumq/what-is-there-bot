@@ -31,7 +31,8 @@ def close_deal_kb(deal: Deal):
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.chat.done_deal, **button_cb('done_deal'))],
-        [InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))]
+        [InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))],
+        [InlineKeyboardButton(Buttons.chat.cancel, **button_cb('back'))]
     ]
 
     return InlineKeyboardMarkup(

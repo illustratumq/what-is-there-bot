@@ -1,7 +1,7 @@
 from PIL import ImageFont, ImageDraw, Image
 
 
-def make_media_template(title: str, description: str, price: int):
+def make_post_media_template(title: str, description: str, price: int):
     price = 'Договірна' if price == 0 else f'{price} грн.'
     logo = Image.open('app/data/template.png')
     font = ImageFont.truetype('calibri.ttf', 65)
@@ -16,6 +16,30 @@ def make_media_template(title: str, description: str, price: int):
     return new_path
 
 
+def make_admin_media_template(room_name: str, reason: str, status: str, file: str):
+    logo = Image.open(f'app/data/template-admin-{file}.png')
+    font = ImageFont.truetype('calibri.ttf', 55)
+    drawer = ImageDraw.Draw(logo)
+    drawer.text((50, 70), f'Адміністратор в {room_name}', fill='black', font=font, stroke_width=1)
+    font = ImageFont.truetype('calibri.ttf', 35)
+    drawer.text((50, 155), split_string(reason), fill='#afafaf', font=font)
+    drawer.text((50, 325), f'Статус: {status}', fill='#afafaf', font=font)
+    new_path = f'app/data/{room_name}.png'
+    logo.save(new_path)
+    return new_path
+
+
+def make_chat_photo_template(number: int):
+    logo = Image.open(f'app/data/chat_photo.png')
+    font = ImageFont.truetype('calibri.ttf', 120)
+    drawer = ImageDraw.Draw(logo)
+    y_pos = 250 - 25 * (len(str(number)) - 1)
+    drawer.text((y_pos, 200), f'{number}', fill='#333333', font=font, stroke_width=1)
+    new_path = f'app/data/chat_photo_{number}.png'
+    logo.save(new_path)
+    return new_path
+
+
 def split_string(string: str, n: int = 45):
     new_string = ''
     for word in string.split(' '):
@@ -25,5 +49,7 @@ def split_string(string: str, n: int = 45):
             new_string += word
         new_string += ' '
     return new_string
+
+
 
 

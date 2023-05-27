@@ -34,9 +34,9 @@ def moderate_post_kb(post: Post):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[
-            [InlineKeyboardButton(Buttons.post.publish_all, callback_data=button_cb('publish_all'))],
             [InlineKeyboardButton(Buttons.post.publish.split(' ')[0], callback_data=button_cb('approve')),
-             InlineKeyboardButton(Buttons.post.cancel, callback_data=button_cb('cancel'))]
+             InlineKeyboardButton(Buttons.post.cancel, callback_data=button_cb('cancel'))],
+            [InlineKeyboardButton(Buttons.post.publish_all, callback_data=button_cb('publish_all'))]
         ]
     )
 

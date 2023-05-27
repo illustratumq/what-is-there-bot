@@ -1,9 +1,10 @@
+import os
 import re
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import CommandStart, ChatTypeFilter, Command
-from aiogram.types import Message, ChatType
+from aiogram.types import Message, ChatType, InputFile
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
@@ -13,29 +14,31 @@ from app.filters import IsAdminFilter
 from app.keyboards import Buttons
 from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb
 from app.keyboards.reply.menu import menu_kb
+from app.misc.media_template import make_admin_media_template
 from app.states.states import ParticipateSG
 
 PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')
 ADMIN_HELP_REGEX = re.compile(r'helpdeal-(\d+)')
 
 greeting_text = (
-        'Цей бот дозволяє вам опублікувати та керувати постами на каналі А ШО ТАМ?\n\n'
-        'Нижче в чаті ви побачите кнопки, які дозволяють вам взаємодіяти з ботом. 👇\n\n'
+        'Цей бот дозволяє вам публікувати та керувати постами на каналі А ШО ТАМ?\n\n'
+        'В нижній частині чату у Вас є кнопки для взаємодії з ботом 👇\n\n'
         '<b>Новий пост ➕</b> - Опублікувати новий пост на каналі.\n'
-        '<b>Мої чати 💬</b> -  Переглянути ваші активні чати.\n'
-        '<b>Мій рейтинг ⭐</b> - Переглянути ваш рейтинг у сервісі та додати опис про себе.\n'
         '<b>Мої пости 📑</b> -  Переглянути та керувати своїми постами на каналі.\n'
-        '<b>Мої кошти 💸</b> - Перевірити ваш баланс та вивести кошти з рахунку каналу.\n'
+        '<b>Мої кошти 💸</b> - Перевірити баланс та вивести кошти з рахунку.\n'
+        '<b>Мій рейтинг ⭐</b> - Переглянути рейтинг у сервісі та додати опис про себе.\n'
+        '<b>Мої чати 💬</b> -  Переглянути активні чати.\n'
         '<b>Сповіщення 🔔</b> -  Налаштувати сповіщення про нові пости на каналі.\n\n'
-        'Якщо у вас є запитання щодо реклами, співпраці або будь-яких інших питань, '
-        'а також якщо у вас є ідеї щодо покращення сервісу, ви можете зв\'язатися з адміністрацією'
-        ' каналу за допомогою контакту @'
+        'Якщо у вас є питання щодо реклами, співпраці або будь-яких інших питань, '
+        'а також ідеї покращення сервісу, ви можете зв\'язатися з адміністрацією '
+        'написавши сюди @AShoTam_Bot'
     )
 
 
 async def start_cmd(msg: Message, state: FSMContext):
     await state.finish()
-    await msg.answer(greeting_text, reply_markup=menu_kb())
+    await msg.answer(greeting_text if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню',
+                     reply_markup=menu_kb())
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
@@ -89,10 +92,7 @@ async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, p
         f'Ціна угоди: {deal.construct_price()}\n'
         f'Статус оплати: {deal.chat_status()}\n\n'
     )
-    text_to_channel = (
-        f'{room.construct_admin_moderate_text()}\n\n'
-        f'Розглядається адміном: {admin.mention}'
-    )
+    text_to_channel = await room.construct_admin_moderate_text(room_db, msg.bot, config, admin)
     message = await msg.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
     await room_db.update_room(deal.chat_id, admin_id=admin.user_id, message_id=message.message_id)
     await msg.answer(text_to_admin, reply_markup=add_admin_chat_kb(deal, admin))

@@ -22,7 +22,9 @@ async def my_chats_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, room_
         if deal.status == DealStatusEnum.BUSY and deal.chat_id:
             post = await post_db.get_post(deal.post_id)
             room = await room_db.get_room(deal.chat_id)
-            text += f'{counter}. 🔗 {room.invite_link} "{post.title}" (Ви замовник)\n'
+            text += (
+                f'{counter}. 🔗 <a href="{room.invite_link}">{room.name}</a> (Ви замовник)\n'
+            )
             counter += 1
 
     for deal in deals_executor:

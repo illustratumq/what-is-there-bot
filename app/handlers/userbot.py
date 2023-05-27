@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 from pyrogram import Client
@@ -7,6 +8,7 @@ from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
 from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
 
 from app.config import UserBot
+from app.misc.media_template import make_chat_photo_template
 from app.misc.times import now
 
 
@@ -42,7 +44,7 @@ class UserbotController:
     async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink, str]:
         async with self._client as client:
             chat, room_name = await self._create_group(client, last_room_number)
-            await self._set_chat_photo(chat)
+            await self._set_chat_photo(chat, last_room_number)
             await self._set_chat_permissions(client, chat)
             await self._set_bot_admin(client, chat)
             invite_link = await self._create_invite_link(client, chat)
@@ -63,8 +65,11 @@ class UserbotController:
         )
         await client.set_chat_permissions(chat.id, permissions)
 
-    async def _set_chat_photo(self, chat: Chat) -> None:
-        await chat.set_photo(photo=self._chat_photo_path)
+    @staticmethod
+    async def _set_chat_photo(chat: Chat, last_room_number: int) -> None:
+        new_photo_path = make_chat_photo_template(last_room_number + 1)
+        await chat.set_photo(photo=new_photo_path)
+        os.remove(new_photo_path)
 
     @staticmethod
     async def _create_invite_link(client: Client, chat: Chat) -> ChatInviteLink:

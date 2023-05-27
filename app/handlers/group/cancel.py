@@ -2,19 +2,20 @@ from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message
+from aiogram.utils.exceptions import ChatAdminRequired
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, UserTypeEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
+from app.keyboards.inline.deal import help_admin_kb
 from app.keyboards.inline.post import participate_kb
 
 
 async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo):
     await call.message.delete()
-    await call.answer()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     text = (
@@ -25,14 +26,6 @@ async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     await call.message.answer(
         text, reply_markup=close_deal_kb(deal)
     )
-
-
-async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, state: FSMContext):
-    await call.message.delete()
-    deal = await deal_db.get_deal_chat(call.message.chat.id)
-    await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
-    await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
-    await call.message.answer('Дія була відмінена')
 
 
 async def confirm_done_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
@@ -85,7 +78,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     if deal.payed > 0:
         back_to_customer = deal.payed
         commission = await commission_db.get_commission(customer.commission_id)
-        commission = await commission.calculate_commission(deal.payed)
+        commission = commission.calculate_commission(deal.payed)
         customer_balance = customer.balance + back_to_customer + commission
         await user_db.update_user(customer.user_id, balance=customer_balance)
         text = (
@@ -120,17 +113,16 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     # await userbot.clean_chat_history(chat_id=deal.chat_id)
 
     room = await room_db.get_room(deal.chat_id)
-    users = deal.participants
-    if room.admin_id:
-        users.append(room.admin_id)
-    for user_id in users:
+    for user_id in deal.participants:
         try:
-            user = await user_db.get_user(user_id)
-            if user.type == UserTypeEnum.MODERATOR:
-                await userbot.kick_chat_member(deal.chat_id, user_id)
-        except:
             await bot.kick_chat_member(deal.chat_id, user_id=user_id)
-
+        except:
+            pass
+    if room.admin_id:
+        try:
+            await userbot.kick_chat_member(deal.chat_id, room.admin_id)
+        except:
+            pass
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
@@ -198,16 +190,16 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
         # await userbot.clean_chat_history(chat_id=call.message.chat.id)
 
-        users = deal.participants
-        if room.admin_id:
-            users.append(room.admin_id)
-        for user_id in await users:
+        for user_id in deal.participants:
             try:
-                user = await user_db.get_user(user_id)
-                if user.type == UserTypeEnum.MODERATOR:
-                    await userbot.kick_chat_member(deal.chat_id, user_id)
+                await userbot.kick_chat_member(deal.chat_id, user_id)
             except:
-                await call.bot.kick_chat_member(call.message.chat.id, user_id=user_id)
+                pass
+        if room.admin_id:
+            try:
+                await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
+            except ChatAdminRequired:
+                pass
 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
@@ -257,11 +249,19 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
         customer = await user_db.get_user(deal.customer_id)
         post = await post_db.get_post(deal.post_id)
         user = 'Замовник' if msg.from_user.id == customer.user_id else 'Виконавець'
-        text = (
-            f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
-        )
-        await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                     commission_db, userbot, config, message=text)
+        if deal.payed == 0:
+            text = (
+                f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
+            )
+            await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
+                                         commission_db, userbot, config, message=text)
+        else:
+            room = await room_db.get_room(deal.chat_id)
+            await room_db.update_room(room.chat_id, reason=f'{user} покинув чат')
+            text = await room.construct_admin_moderate_text(room_db, msg.bot, config)
+            msg = await msg.bot.send_message(config.misc.admin_channel_id, text,
+                                             reply_markup=await help_admin_kb(deal.deal_id))
+            await room_db.update_room(room.chat_id, message_id=msg.message_id)
 
 
 def setup(dp: Dispatcher):
@@ -279,5 +279,3 @@ def setup(dp: Dispatcher):
         state='conf_cancel_deal')
     dp.register_message_handler(
         left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
-    dp.register_callback_query_handler(
-        cancel_action_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='back'), state='*')

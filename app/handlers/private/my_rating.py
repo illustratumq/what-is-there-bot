@@ -1,14 +1,11 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import Message, ChatType, CallbackQuery
-from aiogram.utils.callback_data import CallbackData
+from aiogram.types import Message, ChatType
 
-from app.database.services.repos import UserRepo, DealRepo, PostRepo
+from app.database.services.repos import UserRepo, DealRepo
 from app.keyboards import Buttons
-from app.keyboards.inline.deal import pagination_deal_kb
 from app.keyboards.reply.menu import basic_kb
 from app.states.states import UserAboutSG
-
 
 MAX_CHAR_IN_MESSAGE = 4096
 

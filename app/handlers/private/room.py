@@ -11,6 +11,7 @@ from app.filters import IsAdminFilter
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.deal import deal_cb, join_room_kb, help_admin_kb, add_chat_cb
 from app.misc.commands import set_new_room_commands
+from app.misc.media_template import make_admin_media_template
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
@@ -59,9 +60,9 @@ async def refuse_admin_enter_chat(call: CallbackQuery, callback_data: dict, deal
     deal = await deal_db.get_deal(deal_id)
     room = await room_db.get_room(deal.chat_id)
     await call.bot.delete_message(config.misc.admin_channel_id, room.message_id)
-    message = await call.bot.send_message(config.misc.admin_channel_id, room.construct_admin_moderate_text(),
-                                          reply_markup=await help_admin_kb(deal.deal_id))
-    await room_db.update_room(room.chat_id, admin_id=None, message_id=message.message_id)
+    text = await room.construct_admin_moderate_text(room_db, call.bot, config)
+    msg = await call.bot.send_message(config.misc.admin_channel_id, text, reply_markup=await help_admin_kb(deal.deal_id))
+    await room_db.update_room(room.chat_id, message_id=msg.message_id)
     await call.answer('Ви відмовились від модерування цього чату. Повідомлення оновлено в каналі', show_alert=True)
     await call.message.delete()
 

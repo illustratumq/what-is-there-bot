@@ -54,18 +54,14 @@ def user_setting_kb(deal: Deal, setting: Setting):
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.deal.admin.ban_user, **button_cb('ban_user'))],
-        [
-            InlineKeyboardButton(setting.format('Може бути замовником', setting.can_be_customer),
-                                 **button_cb('can_be_customer')),
-            InlineKeyboardButton(setting.format('Може бути виконавцем', setting.can_be_executor),
-                                 **button_cb('can_be_executor'))
-        ],
-        [
-            InlineKeyboardButton(setting.format('Може публікувати пости', setting.can_publish_post),
-                                 **button_cb('can_publish_post')),
-            InlineKeyboardButton(setting.format('Перевіряти пости', setting.need_check_post),
-                                 **button_cb('need_check_post'))
-        ],
+        [InlineKeyboardButton(setting.format('Може бути замовником', setting.can_be_customer),
+                              **button_cb('can_be_customer'))],
+        [InlineKeyboardButton(setting.format('Може бути виконавцем', setting.can_be_executor),
+                              **button_cb('can_be_executor'))],
+        [InlineKeyboardButton(setting.format('Може публікувати пости', setting.can_publish_post),
+                              **button_cb('can_publish_post'))],
+        [InlineKeyboardButton(setting.format('Перевіряти пости', setting.need_check_post),
+                              **button_cb('need_check_post'))],
         [back_bt(to='select_user', deal_id=deal.deal_id)]
 
     ]

@@ -92,7 +92,7 @@ def add_admin_chat_kb(deal: Deal, user: User, only_refuse: bool = False):
     ]
 
     if not only_refuse:
-        inline_keyboard[0].insert(0, InlineKeyboardButton(Buttons.deal.admin.enter_chat, **button_cb('enter')),)
+        inline_keyboard.insert(0, [InlineKeyboardButton(Buttons.deal.admin.enter_chat, **button_cb('enter'))])
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 

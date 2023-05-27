@@ -19,7 +19,6 @@ NEW_PRICE_REGEX = re.compile(
 async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
                          user_db: UserRepo, commission_db: CommissionRepo, state: FSMContext):
     await call.message.delete()
-    await call.answer()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
@@ -51,21 +50,20 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
         )
         await msg.reply(text, reply_markup=back_chat_kb(deal))
         return
-    await msg.reply(f'Ви становили ціну - {new_price} грн')
     await state.storage.update_data(chat=msg.chat.id, user=msg.from_user.id, price=new_price)
     customer_data = await state.storage.get_data(chat=msg.chat.id, user=deal.customer_id)
     executor_data = await state.storage.get_data(chat=msg.chat.id, user=deal.executor_id)
-    if customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
-        customer = await user_db.get_user(deal.customer_id)
-        await apply_new_price(msg, deal_db, deal, state, customer, new_price)
-        return
     if customer_data['price'] == 0 or executor_data['price'] == 0:
         if customer_data['price'] == 0:
             user = await user_db.get_user(deal.customer_id)
         else:
             user = await user_db.get_user(deal.executor_id)
-        await msg.answer(f'{user.mention}, відправте таке ж саме число, щоб підтвердити зміну ціни.',
-                         reply_markup=back_chat_kb(deal))
+        await msg.reply(f'Ви становили ціну - {new_price} грн. {user.mention}, відправте таке ж саме число, '
+                        f'щоб підтвердити зміну ціни.', reply_markup=back_chat_kb(deal))
+    elif customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
+        customer = await user_db.get_user(deal.customer_id)
+        await apply_new_price(msg, deal_db, deal, state, customer, new_price)
+        return
     else:
         await msg.answer('Ціни які ви вказали не співпадають.')
 
@@ -73,7 +71,7 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
 async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
                           state: FSMContext, customer: UserRepo.model, price: int):
     text = (
-        f'Ціна угоди була успішно змінена на {price} грн.\n\n'
+        f'🔔 Ціна угоди була успішно змінена на {price} грн.\n\n'
     )
     if deal.payed == 0:
         text += (

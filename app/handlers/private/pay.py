@@ -40,15 +40,14 @@ async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db
     await user_db.update_user(deal.customer_id, balance=customer.balance - need_to_pay - commission)
     await deal_db.update_deal(deal.deal_id, payed=need_to_pay)
     text_to_chat = (
-        f'💸 Угода була успішно сплачена, кошти зберігаються на балансі сервісу.\n\n'
-        f'{executor.create_html_link("Виконавець")} можете приступати до роботи!\n\n'
-        f'Відкрити меню чату /menu'
+        f'🔔 Угода була успішно сплачена, кошти зберігаються на балансі сервісу. '
+        f'{executor.create_html_link("Виконавець")} можете приступати до роботи!'
     )
     text_to_executor = (
         f'🔔 Замовник оплатив угоду "{post.title}", можете приступати до виконання завдання.'
     )
     text_to_customer = (
-        f'Угода успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.'
+        f'✅ Угода успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.'
     )
     await call.message.answer(text_to_customer)
     await call.bot.send_message(deal.executor_id, text_to_executor)

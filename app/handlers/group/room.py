@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from aiogram import Dispatcher
+from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import ChatJoinRequest, CallbackQuery, ChatType, Message
 from pyrogram.errors import UserAlreadyParticipant
@@ -37,18 +38,20 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     deal_id = int(callback_data['deal_id'])
     admin_id = int(callback_data['admin_id'])
     deal = await deal_db.get_deal(deal_id)
-    admin = await user_db.get_user(call.from_user.id)
-    reply_markup = add_admin_chat_kb(deal, admin, only_refuse=True)
+    admin = await user_db.get_user(admin_id)
+    reply_markup = add_admin_chat_kb(deal, admin)
     try:
         await userbot.add_chat_member(deal.chat_id, admin_id)
     except UserAlreadyParticipant:
         room = await room_db.get_room(deal.chat_id)
-        await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True)
+        await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True,
+                                  reply_markup=reply_markup)
     except Exception as Error:
-        await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина:\n\n{Error}')
-    await call.message.edit_reply_markup(reply_markup=reply_markup)
+        await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина:\n\n{Error}',
+                                  reply_markup=reply_markup)
     await set_new_room_commands(call.bot, deal.chat_id, admin_id)
     await deal_db.update_deal(deal.deal_id, next_activity_date=None)
+    await call.message.delete()
 
 
 async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo):
@@ -86,6 +89,25 @@ async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
         f'<b>Статус угоди</b>: {deal.chat_status()}\n'
     )
     await msg.answer(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
+
+
+async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo,
+                            state: FSMContext):
+    # await call.message.delete()
+    deal = await deal_db.get_deal_chat(call.message.chat.id)
+    post = await post_db.get_post(deal.post_id)
+    await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
+    await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
+    customer = await user_db.get_user(deal.customer_id)
+    executor = await user_db.get_user(deal.executor_id)
+    text = (
+        f'💬 Меню чату "{post.title}"\n\n'
+        f'<b>Замовник</b>: {customer.mention}\n'
+        f'<b>Виконавець</b>: {executor.mention}\n\n'
+        f'<b>Встановленна ціна:</b> {deal.construct_price()}\n'
+        f'<b>Статус угоди</b>: {deal.chat_status()}\n'
+    )
+    await call.message.edit_text(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
 
 
 async def send_media_chat(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
@@ -128,10 +150,12 @@ async def call_admin_to_room_cmd(call: CallbackQuery, deal_db: DealRepo, room_db
         )
         await call.message.answer(text)
         return
-    msg = await call.bot.send_message(config.misc.admin_channel_id, room.construct_admin_moderate_text(),
+    await room_db.update_room(room.chat_id, reason='Виклик користувачем із чату', admin_required=True)
+    text = await room.construct_admin_moderate_text(room_db, call.bot, config)
+    msg = await call.bot.send_message(config.misc.admin_channel_id, text,
                                       reply_markup=await help_admin_kb(deal.deal_id))
-    await room_db.update_room(room.chat_id, message_id=msg.message_id, admin_required=True)
-    await call.message.answer('Адмінінстратора було викликано у чат! Зачекайте, він невдовзі приєднається')
+    await room_db.update_room(room.chat_id, message_id=msg.message_id)
+    await call.message.answer('Адміністратора було викликано у чат! Зачекайте, він невдовзі приєднається')
 
 
 def setup(dp: Dispatcher):
@@ -145,4 +169,5 @@ def setup(dp: Dispatcher):
         call_admin_to_room_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='help'), state='*')
     dp.register_callback_query_handler(
         add_admin_to_chat_cmd, ChatTypeFilter(ChatType.PRIVATE), add_chat_cb.filter(action='enter'), state='*')
-
+    dp.register_callback_query_handler(
+        cancel_action_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='back'), state='*')
