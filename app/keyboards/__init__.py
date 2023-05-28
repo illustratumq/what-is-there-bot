@@ -17,6 +17,7 @@ class Menu:
     payout: str = 'Вивести кошти'
     about: str = 'Додати опис ➕'
     comment: str = 'Відгуки про мене 💭'
+    admin: str = '🔁 В адмін-панель'
     back: str = '◀ Назад'
 
 
@@ -86,10 +87,20 @@ class Pay:
     cancel: str = 'Відмінити'
 
 
+class Admin:
+    statistic: str = '📊 Статистика'
+    commission: str = '💵 Комісія'
+    setting: str = '⚙ Налаштування'
+    user: str = '🗂 Юзери'
+    menu: str = '🔁 В головне меню'
+    back: str = '◀ В адмін панель'
+
+
 class Buttons:
     menu = Menu()
     action = Action()
     post = Post()
     deal = Deal()
     chat = Chat()
+    admin = Admin()
     pay = Pay()

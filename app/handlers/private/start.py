@@ -8,7 +8,7 @@ from aiogram.types import Message, ChatType, InputFile
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum
+from app.database.services.enums import DealStatusEnum, UserTypeEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo
 from app.filters import IsAdminFilter
 from app.keyboards import Buttons
@@ -35,10 +35,11 @@ greeting_text = (
     )
 
 
-async def start_cmd(msg: Message, state: FSMContext):
+async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo):
     await state.finish()
+    user = await user_db.get_user(msg.from_user.id)
     await msg.answer(greeting_text if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню',
-                     reply_markup=menu_kb())
+                     reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,

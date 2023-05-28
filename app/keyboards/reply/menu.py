@@ -8,6 +8,10 @@ def menu_kb(admin: bool = False):
         [KeyboardButton(Buttons.menu.my_rating), KeyboardButton(Buttons.menu.my_chats)],
         [KeyboardButton(Buttons.menu.notifications)]
     ]
+
+    if admin:
+        keyboard[-1].append(KeyboardButton(Buttons.menu.admin))
+
     return ReplyKeyboardMarkup(
         row_width=2,
         resize_keyboard=True,
