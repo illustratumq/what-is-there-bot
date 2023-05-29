@@ -1,9 +1,10 @@
-from app.database.models import Deal, Setting
+from app.database.models import Deal, Setting, Post
 from app.keyboards.inline.back import back_bt
 from app.keyboards.inline.base import *
 
 admin_room_cb = CallbackData('adr', 'deal_id', 'action')
 user_setting_cb = CallbackData('ust', 'deal_id', 'user_id', 'action')
+manage_post_cb = CallbackData('mg', 'post_id', 'action')
 
 
 def admin_command_kb(deal: Deal):
@@ -64,6 +65,20 @@ def user_setting_kb(deal: Deal, setting: Setting):
                               **button_cb('need_check_post'))],
         [back_bt(to='select_user', deal_id=deal.deal_id)]
 
+    ]
+
+    return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
+
+
+def manage_post_kb(post: Post):
+
+    def button_cb(action: str):
+        return dict(callback_data=manage_post_cb.new(post_id=post.post_id, action=action))
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.admin.post.delete, **button_cb('delete'))],
+        [InlineKeyboardButton(Buttons.admin.post.delete_comment, **button_cb('delete_comment')),
+         InlineKeyboardButton(Buttons.admin.post.delete_rating, **button_cb('delete_rating'))]
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)

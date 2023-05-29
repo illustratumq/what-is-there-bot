@@ -7,7 +7,7 @@ from aiogram.utils.markdown import hide_link
 from app.config import Config
 from app.database.models import Post
 from app.database.services.enums import PostStatusText, DealStatusEnum
-from app.database.services.repos import PostRepo, DealRepo
+from app.database.services.repos import PostRepo, DealRepo, UserRepo
 from app.handlers.private.start import start_cmd
 from app.keyboards import Buttons
 from app.keyboards.inline.post import construct_posts_list_kb, post_cb, moderate_post_kb, participate_kb, delete_post_kb
@@ -103,9 +103,9 @@ async def update_post_cmd(call: CallbackQuery, callback_data: dict, post_db: Pos
         await call.answer(text, show_alert=True)
 
 
-async def close_posts_cmd(call: CallbackQuery, state: FSMContext):
+async def close_posts_cmd(call: CallbackQuery, state: FSMContext, user_db: UserRepo):
     await call.message.delete()
-    await start_cmd(call.message, state)
+    await start_cmd(call.message, state, user_db)
 
 
 async def back_posts_list_cmd(call: CallbackQuery, post_db: PostRepo):

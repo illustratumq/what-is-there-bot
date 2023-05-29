@@ -32,3 +32,10 @@ class UserBanSG(StatesGroup):
 
 class UserTimeSG(StatesGroup):
     Input = State()
+
+
+class CommissionAdminSG(StatesGroup):
+    Select = State()
+    Edit = State()
+    Parameter = State()
+    Save = State()

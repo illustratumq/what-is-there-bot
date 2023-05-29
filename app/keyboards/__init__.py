@@ -87,13 +87,37 @@ class Pay:
     cancel: str = 'Відмінити'
 
 
+class Commission:
+    name: str = 'Назва'
+    description: str = 'Опис'
+    minimal: str = 'Мінімальна ціна'
+    maximal: str = 'Макимальна ціна'
+    commission: str = 'Відсоток'
+    under: str = 'Фіксована комісія'
+    trigger: str = 'Гранична ціна'
+
+
+class AdminPost:
+    delete: str = 'Видалити пост'
+    delete_comment: str = 'Видалити коментар'
+    delete_rating: str = 'Видалити оцінку'
+    delete_force: str = 'Видалити примусово'
+    back: str = '◀ Назад'
+
+
 class Admin:
+    post = AdminPost()
+    commission_edit = Commission()
     statistic: str = '📊 Статистика'
     commission: str = '💵 Комісія'
     setting: str = '⚙ Налаштування'
     user: str = '🗂 Юзери'
     menu: str = '🔁 В головне меню'
-    back: str = '◀ В адмін панель'
+    edit: str = 'Редагувати'
+    add_new: str = '➕ Новий пакунок'
+    cancel: str = 'Відмінити'
+    to_admin: str = '◀ В адмін панель'
+    to_packs: str = '◀ До пакунків'
 
 
 class Buttons:

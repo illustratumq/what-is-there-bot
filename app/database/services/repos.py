@@ -12,6 +12,12 @@ class UserRepo(BaseRepo[User]):
     async def get_user(self, user_id: int) -> User:
         return await self.get_one(self.model.user_id == user_id)
 
+    async def get_users_commission(self, commission_id: int, count: bool = False):
+        if count:
+            return await self.count(self.model.commission_id == commission_id)
+        else:
+            return await self.get_all(self.model.commission_id == commission_id)
+
     async def update_user(self, user_id: int, **kwargs) -> None:
         return await self.update(self.model.user_id == user_id, **kwargs)
 
@@ -52,6 +58,9 @@ class DealRepo(BaseRepo[Deal]):
 
     async def get_deal_customer(self, customer_id: int, status: DealStatusEnum) -> list[Deal]:
         return await self.get_all(self.model.customer_id == customer_id, self.model.status == status)
+
+    async def get_deal_post(self, post_id: int) -> Deal:
+        return await self.get_one(self.model.post_id == post_id)
 
     async def get_comment_deals(self, executor_id: int):
         return await self.get_all(self.model.executor_id == executor_id, self.model.comment != None,
@@ -134,6 +143,9 @@ class CommissionRepo(BaseRepo[Commission]):
 
     async def get_commission(self, pack_id: int) -> Commission:
         return await self.get_one(self.model.pack_id == pack_id)
+
+    async def get_commission_name(self, name: str) -> Commission:
+        return await self.get_one(self.model.name == name)
 
     async def update_commission(self, pack_id: int, **kwargs) -> None:
         return await self.update(self.model.pack_id == pack_id, **kwargs)
