@@ -15,7 +15,7 @@ from app.keyboards import Buttons
 from app.keyboards.inline.admin import manage_post_kb
 from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb
 from app.keyboards.reply.menu import menu_kb
-from app.misc.media_template import make_admin_media_template
+from app.misc.media import make_admin_media_template
 from app.states.states import ParticipateSG
 
 PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')

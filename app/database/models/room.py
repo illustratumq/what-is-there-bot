@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import RoomStatusEnum
-from app.misc.media_template import make_admin_media_template
+from app.misc.media import make_admin_media_template
 
 
 class Room(TimedBaseModel):

@@ -11,7 +11,7 @@ from app.filters import IsAdminFilter
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.deal import deal_cb, join_room_kb, help_admin_kb, add_chat_cb
 from app.misc.commands import set_new_room_commands
-from app.misc.media_template import make_admin_media_template
+from app.misc.media import make_admin_media_template
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,

@@ -18,7 +18,7 @@ from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
 from app.keyboards.inline.post import participate_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
-from app.misc.media_template import make_post_media_template
+from app.misc.media import make_post_media_template
 from app.misc.times import localize, now, next_run_time
 from app.states.states import PostSG
 

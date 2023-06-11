@@ -8,7 +8,7 @@ from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
 from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
 
 from app.config import UserBot
-from app.misc.media_template import make_chat_photo_template
+from app.misc.media import make_chat_photo_template
 from app.misc.times import now
 
 

@@ -31,10 +31,10 @@ def make_admin_media_template(room_name: str, reason: str, status: str, file: st
 
 def make_chat_photo_template(number: int):
     logo = Image.open(f'app/data/chat_photo.png')
-    font = ImageFont.truetype('calibri.ttf', 120)
+    font = ImageFont.truetype('calibri.ttf', 100)
     drawer = ImageDraw.Draw(logo)
-    y_pos = 250 - 25 * (len(str(number)) - 1)
-    drawer.text((y_pos, 200), f'{number}', fill='#333333', font=font, stroke_width=1)
+    y_pos = 300 - 30 * (len(str(number)) - 1)
+    drawer.text((y_pos, 265), f'{number}', fill='#333333', font=font, stroke_width=1)
     new_path = f'app/data/chat_photo_{number}.png'
     logo.save(new_path)
     return new_path
@@ -49,6 +49,7 @@ def split_string(string: str, n: int = 45):
             new_string += word
         new_string += ' '
     return new_string
+
 
 
 
