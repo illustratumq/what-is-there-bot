@@ -3,7 +3,7 @@ from PIL import ImageFont, ImageDraw, Image
 
 def make_post_media_template(title: str, description: str, price: int):
     price = 'Договірна' if price == 0 else f'{price} грн.'
-    logo = Image.open('app/data/template.png')
+    logo = Image.open("app/data/template.png")
     font = ImageFont.truetype('calibri.ttf', 65)
     drawer = ImageDraw.Draw(logo)
     drawer.text((50, 120), split_string(title, n=22), fill='black', font=font, stroke_width=1)

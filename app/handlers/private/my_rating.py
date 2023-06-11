@@ -7,8 +7,6 @@ from app.keyboards import Buttons
 from app.keyboards.reply.menu import basic_kb
 from app.states.states import UserAboutSG
 
-MAX_CHAR_IN_MESSAGE = 4096
-
 
 async def my_rating_cmd(msg: Message, user_db: UserRepo, deal_db: DealRepo):
     user = await user_db.get_user(msg.from_user.id)

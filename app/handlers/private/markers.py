@@ -85,26 +85,24 @@ async def set_marker_time(msg: Message):
     await UserTimeSG.Input.set()
 
 
-async def save_marker_time(msg: Message, user_db: UserRepo, marker_db: MarkerRepo, state: FSMContext):
+async def save_marker_time(msg: Message, user_db: UserRepo, state: FSMContext):
     try:
         start, end = msg.text.split('-')
+        if int(end) < int(start):
+            await msg.answer('Години мають бути вказані від меншої до більшої, спробуйте ще раз')
+            return
         await user_db.update_user(msg.from_user.id, time=f'{int(start)}-{int(end)}')
         await msg.answer('Години успішно збережені')
-        await moderate_markers_cmd(msg, marker_db)
+        await markers_cmd(msg)
         await state.finish()
     except:
         await msg.answer('Упс, формат даних некоректний, спробуй ще раз')
-
-
-async def dev_cmd(msg: Message):
-    await msg.answer('Цей розділ ще у розробці...')
 
 
 def setup(dp: Dispatcher):
     dp.register_message_handler(
         markers_cmd, ChatTypeFilter(ChatType.PRIVATE), text=[Buttons.menu.notifications, Buttons.menu.to_markers],
         state='*')
-    # dp.register_message_handler(dev_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.work_times, state='*')
     dp.register_message_handler(
         moderate_markers_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.markers, state='*')
     dp.register_message_handler(

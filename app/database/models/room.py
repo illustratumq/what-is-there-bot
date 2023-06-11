@@ -24,7 +24,7 @@ class Room(TimedBaseModel):
     async def construct_admin_moderate_text(self, room_db, bot, config, admin=None, done_action: str = None) -> str:
         if not done_action:
             status = 'Активний' if not admin else f'Модерується {admin.full_name}'
-            file = 'need' if not admin else 'proc'
+            file = 'need'
         else:
             status = f'{done_action} {admin.full_name}'
             file = 'done'

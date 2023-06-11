@@ -82,3 +82,18 @@ def manage_post_kb(post: Post):
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
+
+
+def confirm_moderate_post_kb(post: Post, action: str):
+
+    def button_cb(act: str):
+        return dict(callback_data=manage_post_cb.new(post_id=post.post_id, action=act))
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.chat.confirm, **button_cb(f'conf_{action}'))],
+        [InlineKeyboardButton(Buttons.chat.cancel, **button_cb(action))]
+    ]
+
+    return InlineKeyboardMarkup(
+        row_width=1, inline_keyboard=inline_keyboard
+    )
