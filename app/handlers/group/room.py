@@ -16,7 +16,7 @@ from app.misc.commands import set_new_room_commands
 
 
 async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, user_db: UserRepo,
-                                    post_db: PostRepo, userbot: UserbotController):
+                                    post_db: PostRepo, userbot: UserbotController, config: Config):
     deal = await deal_db.get_deal_chat(cjr.chat.id)
     if not deal or cjr.from_user.id not in deal.participants:
         await cjr.bot.send_message(cjr.from_user.id, 'Ви не є учасником цього завдання')
@@ -26,7 +26,7 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     members = await userbot.get_chat_members(cjr.chat.id)
     if deal.customer_id in members and deal.executor_id in members:
         await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=1))
-        await full_room_action(cjr, deal, user_db, post_db)
+        await full_room_action(cjr, deal, user_db, post_db, config)
     else:
         await cjr.bot.send_message(
             cjr.chat.id, text='Зачекайте, доки приєднається інший користувач'
@@ -54,7 +54,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     await call.message.delete()
 
 
-async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo):
+async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo, config: Config):
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     post = await post_db.get_post(deal.post_id)

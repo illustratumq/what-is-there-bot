@@ -1,7 +1,10 @@
+import logging
+import os
+
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message
+from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputFile
 from aiogram.utils.exceptions import ChatAdminRequired
 
 from app.config import Config
@@ -12,6 +15,10 @@ from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
 from app.keyboards.inline.deal import help_admin_kb
 from app.keyboards.inline.post import participate_kb
+from app.misc.media import make_post_media_template
+
+
+log = logging.getLogger(__name__)
 
 
 async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo):
@@ -86,6 +93,10 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         )
         await bot.send_message(deal.customer_id, text)
     await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
+    new_post_photo = make_post_media_template(post.title, post.about, post.price)
+    photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+    await post_db.update_post(post.post_id, media_url=photo_message.url)
+    os.remove(new_post_photo)
     if post.message_id:
         await bot.delete_message(config.misc.post_channel_chat_id, post.message_id)
         post_channel = await bot.send_message(
@@ -116,13 +127,13 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     for user_id in deal.participants:
         try:
             await bot.kick_chat_member(deal.chat_id, user_id=user_id)
-        except:
-            pass
-    if room.admin_id:
-        try:
-            await userbot.kick_chat_member(deal.chat_id, room.admin_id)
-        except:
-            pass
+        except Exception as err:
+            log.warning(f'Помилка в чаті: {err}')
+    # if room.admin_id:
+    #     try:
+    #         await userbot.kick_chat_member(deal.chat_id, room.admin_id)
+    #     except:
+    #         pass
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
@@ -175,8 +186,11 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             f'Угода "{post.title}" була завершена. Оцініть роботу виконавця від 1 до 5.'
         )
         await call.bot.send_message(deal.customer_id, text, reply_markup=evaluate_deal_kb(deal))
-        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None)
         await post_db.update_post(post.post_id, status=DealStatusEnum.DONE)
+        new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
+        photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+        await post_db.update_post(post.post_id, media_url=photo_message.url)
+        os.remove(new_post_photo)
         await call.bot.edit_message_text(
             post.construct_post_text(), config.misc.reserv_channel_id, post.reserv_message_id
         )
@@ -184,22 +198,21 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             await call.bot.edit_message_text(
                 post.construct_post_text(), config.misc.post_channel_chat_id, post.message_id
             )
-        await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
-                                  message_id=None)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
-        # await userbot.clean_chat_history(chat_id=call.message.chat.id)
-
         for user_id in deal.participants:
             try:
                 await userbot.kick_chat_member(deal.chat_id, user_id)
-            except:
-                pass
-        if room.admin_id:
-            try:
-                await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
-            except ChatAdminRequired:
-                pass
+            except Exception as err:
+                log.warning(f'Помилка в чаті: {err}')
+        # if room.admin_id:
+        #     try:
+        #         await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
+        #     except ChatAdminRequired:
+        #         pass
+        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None)
+        await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
+                                  message_id=None)
 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,

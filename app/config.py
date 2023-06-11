@@ -53,6 +53,7 @@ class UserBot:
 @dataclass
 class Miscellaneous:
     log_level: int
+    server_host_ip: str
     media_channel_chat_id: int
     post_channel_chat_id: int
     admin_channel_id: int
@@ -103,7 +104,8 @@ class Config:
                 update_commands=env.bool('UPDATE_COMMANDS', True),
                 admin_channel_id=env.int('ADMIN_CHANNEL_ID'),
                 reserv_channel_id=env.int('RESERV_CHANNEL_ID'),
-                timezone=env.str('TIMEZONE')
+                timezone=env.str('TIMEZONE'),
+                server_host_ip=env.str('SERVER_HOST_IP')
             ),
             userbot=UserBot(
                 api_id=env.str('USERBOT_API_ID', None),

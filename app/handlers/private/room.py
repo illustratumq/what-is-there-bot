@@ -1,8 +1,9 @@
+import os
 from datetime import timedelta, datetime
 
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import CallbackQuery, ChatActions, ChatType
+from aiogram.types import CallbackQuery, ChatActions, ChatType, InputFile
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum
@@ -11,7 +12,7 @@ from app.filters import IsAdminFilter
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.deal import deal_cb, join_room_kb, help_admin_kb, add_chat_cb
 from app.misc.commands import set_new_room_commands
-from app.misc.media import make_admin_media_template
+from app.misc.media import make_post_media_template
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
@@ -30,6 +31,10 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     await post_db.update_post(deal.post_id, status=DealStatusEnum.BUSY)
 
     post = await post_db.get_post(deal.post_id)
+    new_post_photo = make_post_media_template(post.title, post.about, post.price, version='proc')
+    photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+    await post_db.update_post(post.post_id, media_url=photo_message.url)
+    os.remove(new_post_photo)
     if post.message_id:
         await call.bot.edit_message_text(
             chat_id=config.misc.post_channel_chat_id, message_id=post.message_id,

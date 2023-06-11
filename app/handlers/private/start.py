@@ -1,10 +1,9 @@
-import os
 import re
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import CommandStart, ChatTypeFilter, Command
-from aiogram.types import Message, ChatType, InputFile
+from aiogram.types import Message, ChatType
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
@@ -15,7 +14,6 @@ from app.keyboards import Buttons
 from app.keyboards.inline.admin import manage_post_kb
 from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb
 from app.keyboards.reply.menu import menu_kb
-from app.misc.media import make_admin_media_template
 from app.states.states import ParticipateSG
 
 PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')
@@ -38,10 +36,13 @@ greeting_text = (
 
 
 async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo):
-    await state.finish()
-    user = await user_db.get_user(msg.from_user.id)
-    await msg.answer(greeting_text if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню',
-                     reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
+    if not msg.from_user.is_bot:
+        user = await user_db.get_user(msg.from_user.id)
+        await msg.answer(greeting_text if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню',
+                         reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
+    else:
+        await msg.answer(greeting_text, reply_markup=menu_kb())
+        await state.finish()
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
@@ -102,7 +103,7 @@ async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, p
 
 
 async def manage_post_cmd(msg: Message, deep_link: re.Match, post_db: PostRepo,
-                        user_db: UserRepo, room_db: RoomRepo, deal_db: DealRepo, config: Config):
+                          user_db: UserRepo, room_db: RoomRepo, deal_db: DealRepo, config: Config):
     await msg.delete()
     post_id = int(deep_link.groups()[-1])
     post = await post_db.get_post(post_id)

@@ -5,6 +5,7 @@ from pyrogram import Client
 from pyrogram.errors import ChatIdInvalid
 from pyrogram.raw.core import TLObject
 from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
+from pyrogram.raw.types import ChatAdminRights
 from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
 
 from app.config import UserBot
@@ -66,6 +67,14 @@ class UserbotController:
         await client.set_chat_permissions(chat.id, permissions)
 
     @staticmethod
+    async def _set_chat_admin_rights(client: Client, chat: Chat):
+        rights = ChatAdminRights(
+            change_info=False, post_messages=True, edit_messages=True,
+            delete_messages=True, ban_users=True, invite_users=True, pin_messages=True,
+            add_admins=True, anonymous=True
+        )
+
+    @staticmethod
     async def _set_chat_photo(chat: Chat, last_room_number: int) -> None:
         new_photo_path = make_chat_photo_template(last_room_number + 1)
         await chat.set_photo(photo=new_photo_path)
@@ -73,9 +82,7 @@ class UserbotController:
 
     @staticmethod
     async def _create_invite_link(client: Client, chat: Chat) -> ChatInviteLink:
-        return await client.create_chat_invite_link(
-            chat.id, name='For join requests', expire_date=None, creates_join_request=True
-        )
+        return await client.create_chat_invite_link(chat.id, name='For join requests', creates_join_request=True)
 
     @staticmethod
     async def _invoke(client: Client, raw_function: TLObject) -> None:

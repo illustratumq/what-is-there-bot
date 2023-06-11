@@ -19,6 +19,7 @@ class User(TimedBaseModel):
     status = sa.Column(ENUM(UserStatusEnum), default=UserStatusEnum.ACTIVE, nullable=False)
     type = sa.Column(ENUM(UserTypeEnum), default=UserTypeEnum.USER, nullable=False)
     balance = sa.Column(sa.BIGINT, default=0, nullable=False)
+    bankcard = sa.Column(sa.VARCHAR(16), nullable=True)
     description = sa.Column(sa.VARCHAR(500), nullable=True)
     ban_comment = sa.Column(sa.VARCHAR(500), nullable=True)
     time = sa.Column(sa.VARCHAR(10), nullable=False, default='*')

@@ -98,11 +98,12 @@ class Commission:
 
 
 class AdminPost:
-    delete: str = 'Видалити пост'
+    delete: str = 'Видалити пост 🗑'
     delete_comment: str = 'Видалити коментар'
     delete_rating: str = 'Видалити оцінку'
     delete_force: str = 'Видалити примусово'
-    back: str = '◀ Назад'
+    main: str = '◀ Назад'
+    back: str = 'Закрити'
 
 
 class Admin:

@@ -78,7 +78,8 @@ def manage_post_kb(post: Post):
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.admin.post.delete, **button_cb('delete'))],
         [InlineKeyboardButton(Buttons.admin.post.delete_comment, **button_cb('delete_comment')),
-         InlineKeyboardButton(Buttons.admin.post.delete_rating, **button_cb('delete_rating'))]
+         InlineKeyboardButton(Buttons.admin.post.delete_rating, **button_cb('delete_rating'))],
+        [InlineKeyboardButton(Buttons.admin.post.back, **button_cb('close'))]
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
@@ -91,7 +92,7 @@ def confirm_moderate_post_kb(post: Post, action: str):
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.chat.confirm, **button_cb(f'conf_{action}'))],
-        [InlineKeyboardButton(Buttons.chat.cancel, **button_cb(action))]
+        [InlineKeyboardButton(Buttons.admin.post.back, **button_cb('back'))]
     ]
 
     return InlineKeyboardMarkup(

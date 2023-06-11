@@ -33,15 +33,16 @@ async def edit_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostR
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     text = f'{post.construct_post_text(use_bot_link=False)}\n\n'
-    allow_edit_post = post.status == DealStatusEnum.ACTIVE
+    allow_edit_post = bool(post.status == DealStatusEnum.ACTIVE)
     if not allow_edit_post:
         status = {
             DealStatusEnum.MODERATE: 'він ще не схвалений модератором',
             DealStatusEnum.BUSY: 'він вже виконується у чаті',
-            DealStatusEnum.DISABLES: 'він був відхилений модератором'
+            DealStatusEnum.DISABLES: 'він був відхилений модератором',
         }
-        text += f'Ви не можете редагувати цей пост, оскільки {status[post.status]}\n\n'
-    text += f'{post.construct_html_link("Перейти до поста в каналі")}\n'
+        text += f'Ви не можете редагувати цей пост, оскільки {status[post.status]}{hide_link(post.media_url)}\n\n'
+    else:
+        text += f'{post.construct_html_link("Перейти до поста в каналі")}\n'
     await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post, allow_edit_post))
 
 
