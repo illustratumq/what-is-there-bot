@@ -8,6 +8,7 @@ from pyrogram.errors import UserAlreadyParticipant
 
 from app.config import Config
 from app.database.models import Deal
+from app.database.services.enums import DealTypeEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import room_menu_kb, room_cb
@@ -68,8 +69,9 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'з ними тут (посилання).\n\n'  # TODO: додати посилання на правила сервісу
         f'Для повторного виклику меню, скористайтесь командою /menu'
     )
-    await cjr.bot.send_message(cjr.chat.id, text)
-    message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
+    message = await cjr.bot.send_message(cjr.chat.id, text)
+    if deal.type == DealTypeEnum.PUBLIC:
+        message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
     await cjr.chat.pin_message(message_id=message.message_id)
     await message.answer('Меню чату. Для повторного виклику натисніть /menu',
                          reply_markup=room_menu_kb(deal, media=bool(post.media_url)))

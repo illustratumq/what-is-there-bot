@@ -3,6 +3,7 @@ from aiogram.utils.deep_linking import get_start_link
 from aiogram.utils.markdown import hide_link
 from sqlalchemy.dialects.postgresql import ENUM
 
+from app.config import Config
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import DealStatusEnum, PostStatusText
 
@@ -66,3 +67,8 @@ class Post(TimedBaseModel):
 
     def construct_html_link(self, text: str):
         return f'<a href="{self.post_url}">{text}</a>'
+
+    @property
+    def server_url(self):
+        config = Config.from_env()
+        return f'http://{config.misc.server_host_ip}:8000/admin/whatistherebot/post/{self.post_id}/change/'

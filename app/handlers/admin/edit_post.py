@@ -11,7 +11,7 @@ from app.keyboards.inline.admin import confirm_moderate_post_kb
 
 
 async def moderate_main_page(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
-                             room_db: RoomRepo, user_db: UserRepo):
+                             room_db: RoomRepo, user_db: UserRepo, config: Config):
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     text = (
@@ -26,7 +26,7 @@ async def moderate_main_page(call: CallbackQuery, callback_data: dict, post_db: 
         customer = await user_db.get_user(deal.customer_id)
         executor = await user_db.get_user(deal.executor_id)
         text += f'<b>Угода укладена між:</b> {customer.mention} (Замовник) та {executor.mention} (Виконавець)'
-    await call.message.edit_text(post.construct_post_text(False), reply_markup=manage_post_kb(post))
+    await call.message.edit_text(text, reply_markup=manage_post_kb(post))
 
 async def close_edit_post(call: CallbackQuery):
     await call.answer('Редагування цього поста відмінено', show_alert=True)

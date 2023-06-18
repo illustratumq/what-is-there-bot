@@ -13,7 +13,7 @@ def admin_kb():
 
 
 def construct_packs_kb(packs: list[str]):
-    keyboard = [[KeyboardButton(Buttons.admin.add_new)]]
+    keyboard = []
     for pack in packs:
         keyboard.append([KeyboardButton(pack)])
     keyboard.append([KeyboardButton(Buttons.admin.to_admin)])

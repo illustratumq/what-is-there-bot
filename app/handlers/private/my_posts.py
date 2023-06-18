@@ -6,7 +6,7 @@ from aiogram.utils.markdown import hide_link
 
 from app.config import Config
 from app.database.models import Post
-from app.database.services.enums import PostStatusText, DealStatusEnum
+from app.database.services.enums import PostStatusText, DealStatusEnum, DealTypeEnum
 from app.database.services.repos import PostRepo, DealRepo, UserRepo
 from app.handlers.private.start import start_cmd
 from app.keyboards import Buttons
@@ -29,21 +29,28 @@ async def my_posts_cmd(msg: Message, post_db: PostRepo):
     await msg.answer(text, reply_markup=construct_posts_list_kb(posts))
 
 
-async def edit_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo):
+async def edit_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo):
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     text = f'{post.construct_post_text(use_bot_link=False)}\n\n'
     allow_edit_post = bool(post.status == DealStatusEnum.ACTIVE)
+    allow_delete_post = True
+    deal = await deal_db.get_deal_post(post.post_id)
+    if deal.type == DealTypeEnum.PRIVATE:
+        allow_edit_post = False
+        allow_delete_post = False
     if not allow_edit_post:
+        key = post.status if deal.type == DealTypeEnum.PUBLIC else deal.type
         status = {
             DealStatusEnum.MODERATE: 'він ще не схвалений модератором',
             DealStatusEnum.BUSY: 'він вже виконується у чаті',
             DealStatusEnum.DISABLES: 'він був відхилений модератором',
+            DealTypeEnum.PRIVATE: 'цей пост від приватної угоди'
         }
-        text += f'Ви не можете редагувати цей пост, оскільки {status[post.status]}{hide_link(post.media_url)}\n\n'
+        text += f'Ви не можете редагувати цей пост, оскільки {status[key]}{hide_link(post.media_url)}\n\n'
     else:
         text += f'{post.construct_html_link("Перейти до поста в каналі")}\n'
-    await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post, allow_edit_post))
+    await call.message.edit_text(text=text, reply_markup=moderate_post_kb(post, allow_edit_post, allow_delete_post))
 
 
 async def delete_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo):

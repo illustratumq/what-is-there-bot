@@ -39,3 +39,7 @@ class CommissionAdminSG(StatesGroup):
     Edit = State()
     Parameter = State()
     Save = State()
+
+
+class PrivateDealSG(StatesGroup):
+    SelectRole = State()

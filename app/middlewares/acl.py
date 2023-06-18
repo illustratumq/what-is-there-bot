@@ -26,8 +26,10 @@ class ACLMiddleware(BaseMiddleware):
                     await user_db.update_user(msg.from_user.id, type=UserTypeEnum.MODERATOR)
             elif user.status == UserStatusEnum.BANNED:
                 text = (
-                    f'Вам обмежено доступ до даного сервісу. Причина:\n\n<i>{user.ban_comment}</i>'
+                    f'Вам обмежено доступ до даного сервісу.'
                 )
+                if user.ban_comment:
+                    text += f'\n\nПричина: <i>{user.ban_comment}</i>'
                 await msg.bot.send_message(msg.from_user.id, text)
                 raise CancelHandler()
             else:

@@ -76,7 +76,8 @@ def manage_post_kb(post: Post):
         return dict(callback_data=manage_post_cb.new(post_id=post.post_id, action=action))
 
     inline_keyboard = [
-        [InlineKeyboardButton(Buttons.admin.post.delete, **button_cb('delete'))],
+        [InlineKeyboardButton(Buttons.admin.post.delete, **button_cb('delete')),
+         InlineKeyboardButton(Buttons.admin.post.server, url=post.server_url)],
         [InlineKeyboardButton(Buttons.admin.post.delete_comment, **button_cb('delete_comment')),
          InlineKeyboardButton(Buttons.admin.post.delete_rating, **button_cb('delete_rating'))],
         [InlineKeyboardButton(Buttons.admin.post.back, **button_cb('close'))]

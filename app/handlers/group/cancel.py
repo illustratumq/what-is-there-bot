@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputF
 from aiogram.utils.exceptions import ChatAdminRequired
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
@@ -92,48 +92,63 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             f'На ваш рахунок повернено {back_to_customer + commission} грн.'
         )
         await bot.send_message(deal.customer_id, text)
+
     await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
-    new_post_photo = make_post_media_template(post.title, post.about, post.price)
-    photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
-    await post_db.update_post(post.post_id, media_url=photo_message.url)
-    os.remove(new_post_photo)
-    if post.message_id:
-        await bot.delete_message(config.misc.post_channel_chat_id, post.message_id)
-        post_channel = await bot.send_message(
-            config.misc.post_channel_chat_id, post.construct_post_text(),
-            reply_markup=participate_kb(await post.construct_participate_link()),
-            disable_web_page_preview=True if not post.message_id else False
-        )
-        await post_db.update_post(post.post_id, message_id=post_channel.message_id, post_url=post_channel.url)
-    await bot.delete_message(config.misc.reserv_channel_id, post.reserv_message_id)
-    reserv_channel = await bot.send_message(
-        config.misc.reserv_channel_id, post.construct_post_text(),
-        reply_markup=participate_kb(await post.construct_participate_link()),
-        disable_web_page_preview=True if not post.message_id else False
-    )
-    await post_db.update_post(post.post_id, reserv_message_id=reserv_channel.message_id)
     default_text = f'Угода "{post.title}" була відмінена.'
     for user_id in deal.participants:
         text = default_text if not message else message
         await bot.send_message(user_id, text)
+
+    if deal.type == DealTypeEnum.PUBLIC:
+
+        new_post_photo = make_post_media_template(post.title, post.about, post.price)
+        photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+        await post_db.update_post(post.post_id, media_url=photo_message.url)
+        os.remove(new_post_photo)
+
+        if post.message_id:
+            await bot.delete_message(config.misc.post_channel_chat_id, post.message_id)
+            post_channel = await bot.send_message(
+                config.misc.post_channel_chat_id, post.construct_post_text(),
+                reply_markup=participate_kb(await post.construct_participate_link()),
+                disable_web_page_preview=True if not post.message_id else False
+            )
+            await post_db.update_post(post.post_id, message_id=post_channel.message_id, post_url=post_channel.url)
+        if post.reserv_message_id:
+            await bot.delete_message(config.misc.reserv_channel_id, post.reserv_message_id)
+            reserv_channel = await bot.send_message(
+                config.misc.reserv_channel_id, post.construct_post_text(),
+                reply_markup=participate_kb(await post.construct_participate_link()),
+                disable_web_page_preview=True if not post.message_id else False
+            )
+            await post_db.update_post(post.post_id, reserv_message_id=reserv_channel.message_id)
+
     await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                               message_id=None)
     if reset_state:
         await state.storage.reset_data(chat=deal.chat_id, user=deal.customer_id)
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
     # await userbot.clean_chat_history(chat_id=deal.chat_id)
-
     room = await room_db.get_room(deal.chat_id)
     for user_id in deal.participants:
         try:
-            await bot.kick_chat_member(deal.chat_id, user_id=user_id)
+            print(f'{deal.chat_id=}, {user_id}')
+            await bot.kick_chat_member(chat_id=deal.chat_id, user_id=user_id)
         except Exception as err:
             log.warning(f'Помилка в чаті: {err}')
-    # if room.admin_id:
-    #     try:
-    #         await userbot.kick_chat_member(deal.chat_id, room.admin_id)
-    #     except:
-    #         pass
+
+    if room.admin_id:
+        try:
+            await userbot.kick_chat_member(deal.chat_id, room.admin_id)
+        except:
+            pass
+
+    if deal.type == DealTypeEnum.PRIVATE:
+        if deal.customer_id == post.user_id:
+            await deal_db.update_deal(deal.deal_id, executor_id=None)
+        else:
+            await deal_db.update_deal(deal.deal_id, customer_id=None)
+
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
@@ -187,29 +202,38 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         )
         await call.bot.send_message(deal.customer_id, text, reply_markup=evaluate_deal_kb(deal))
         await post_db.update_post(post.post_id, status=DealStatusEnum.DONE)
-        new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
-        photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
-        await post_db.update_post(post.post_id, media_url=photo_message.url)
-        os.remove(new_post_photo)
-        await call.bot.edit_message_text(
-            post.construct_post_text(), config.misc.reserv_channel_id, post.reserv_message_id
-        )
-        if post.message_id:
+        if deal.type == DealTypeEnum.PUBLIC:
+            new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
+            photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+            await post_db.update_post(post.post_id, media_url=photo_message.url)
+            os.remove(new_post_photo)
             await call.bot.edit_message_text(
-                post.construct_post_text(), config.misc.post_channel_chat_id, post.message_id
+                post.construct_post_text(), config.misc.reserv_channel_id, post.reserv_message_id
             )
+            if post.message_id:
+                await call.bot.edit_message_text(
+                    post.construct_post_text(), config.misc.post_channel_chat_id, post.message_id
+                )
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
         for user_id in deal.participants:
             try:
-                await userbot.kick_chat_member(deal.chat_id, user_id)
+                await call.bot.kick_chat_member(chat_id=deal.chat_id, user_id=user_id)
             except Exception as err:
                 log.warning(f'Помилка в чаті: {err}')
-        # if room.admin_id:
-        #     try:
-        #         await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
-        #     except ChatAdminRequired:
-        #         pass
+
+        if room.admin_id:
+            try:
+                await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
+            except ChatAdminRequired:
+                pass
+
+        if deal.type == DealTypeEnum.PRIVATE:
+            if deal.customer_id == post.user_id:
+                await deal_db.update_deal(deal.deal_id, executor_id=None)
+            else:
+                await deal_db.update_deal(deal.deal_id, customer_id=None)
+
         await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)

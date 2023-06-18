@@ -191,15 +191,16 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
 async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, user_db: UserRepo,
                                     config: Config):
     post = await post_db.get_post(post.post_id)
-    reply_markup = participate_kb(await post.construct_participate_link()) if post.status == DealStatusEnum.ACTIVE else None
-    message = await bot.send_message(
-        config.misc.post_channel_chat_id, post.construct_post_text(),
-        reply_markup=reply_markup, disable_web_page_preview=True if not post.media_id else False
-    )
-    await get_start_link('post-1')
-    await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
-    await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
-    await markers_post_processing(marker_db, post, bot, message.url, user_db)
+    if post:
+        reply_markup = participate_kb(await post.construct_participate_link()) if post.status == DealStatusEnum.ACTIVE else None
+        message = await bot.send_message(
+            config.misc.post_channel_chat_id, post.construct_post_text(),
+            reply_markup=reply_markup, disable_web_page_preview=True if not post.media_id else False
+        )
+        await get_start_link('post-1')
+        await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
+        await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
+        await markers_post_processing(marker_db, post, bot, message.url, user_db)
 
 
 async def markers_post_processing(marker_db: MarkerRepo, post: Post, bot: Bot, url: str, user_db: UserRepo):

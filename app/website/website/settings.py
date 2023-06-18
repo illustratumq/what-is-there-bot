@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -7,13 +8,12 @@ DEBUG = True
 
 
 sys.path.append(r'\Users\pasho\FreelanceProject\what-is-there-bot')  # /src
-
 from app.config import Config
 
 config = Config.from_env()
 
 
-ALLOWED_HOSTS = ['*']  #, config.misc.server_host_ip
+ALLOWED_HOSTS = ['*']  # , config.misc.server_host_ip
 
 # Application definition
 

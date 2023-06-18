@@ -1,24 +1,28 @@
 import re
+from datetime import timedelta, datetime
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import CommandStart, ChatTypeFilter, Command
-from aiogram.types import Message, ChatType
+from aiogram.types import Message, ChatType, ChatActions
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, UserTypeEnum
+from app.database.services.enums import DealStatusEnum, UserTypeEnum, RoomStatusEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo
 from app.filters import IsAdminFilter
+from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.admin import manage_post_kb
-from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb
+from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb, join_room_kb
 from app.keyboards.reply.menu import menu_kb
+from app.misc.commands import set_new_room_commands
 from app.states.states import ParticipateSG
 
 PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')
 ADMIN_HELP_REGEX = re.compile(r'helpdeal-(\d+)')
 MANAGE_POST_REGEX = re.compile(r'manage_post-(\d+)')
+PRIVATE_DEAL_REGEX = re.compile(r'private_deal-(\d+)')
 
 greeting_text = (
         'Цей бот дозволяє вам публікувати та керувати постами на каналі А ШО ТАМ?\n\n'
@@ -122,6 +126,35 @@ async def manage_post_cmd(msg: Message, deep_link: re.Match, post_db: PostRepo,
     await msg.answer(text, reply_markup=manage_post_kb(post))
 
 
+async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, room_db: RoomRepo,
+                                   userbot: UserbotController):
+    await msg.delete()
+    deal_id = int(deep_link.groups()[-1])
+    deal = await deal_db.get_deal(deal_id)
+    if deal.status == DealStatusEnum.BUSY or all([deal.customer_id, deal.executor_id]):
+        await msg.answer('Упс, ця угода вже зайнята. Ти не можеш стати її учасником')
+        return
+    elif deal.customer_id == msg.from_user.id or deal.executor_id == msg.from_user.id:
+        await msg.answer('Ти не можеш стати другим учасником в своїй угоді')
+        return
+    await msg.answer('🎉 Вітаємо. Ви стали 2-им учасником приватної угоди')
+    role = 'customer_id' if deal.executor_id else 'executor_id'
+    room_chat_id, invite_link = await get_room(msg, room_db, userbot)
+    await deal_db.update_deal(
+        deal_id, chat_id=room_chat_id, **{role: msg.from_user.id},
+        next_activity_date=datetime.now() + timedelta(minutes=1)
+    )
+    text = (
+        f'Приватна угода з {msg.from_user.full_name} ухвалена. Заходьте до кімнати за цим посиланням:\n\n'
+        f'{invite_link}\n\nАбо натисніть на кнопку під цим повідомленням'
+    )
+    deal = await deal_db.get_deal(deal_id)
+    await msg.bot.send_message(
+        deal.customer_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
+    await msg.bot.send_message(
+        deal.executor_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
+
+
 def setup(dp: Dispatcher):
     dp.register_message_handler(
         participate_cmd, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PARTICIPATE_REGEX), state='*')
@@ -129,8 +162,29 @@ def setup(dp: Dispatcher):
         admin_help_cmd, IsAdminFilter(), ChatTypeFilter(ChatType.PRIVATE), CommandStart(ADMIN_HELP_REGEX), state='*')
     dp.register_message_handler(
         manage_post_cmd, IsAdminFilter(), ChatTypeFilter(ChatType.PRIVATE), CommandStart(MANAGE_POST_REGEX), state='*')
+    dp.register_message_handler(
+        confirm_private_deal_cmd, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PRIVATE_DEAL_REGEX), state='*')
     dp.register_message_handler(start_cmd, CommandStart(), ChatTypeFilter(ChatType.PRIVATE), state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.admin.menu, state='*')
     dp.register_message_handler(start_cmd, Command('menu'), ChatTypeFilter(ChatType.PRIVATE), state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.action.cancel, state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.back, state='*')
+
+
+async def get_room(msg: Message, room_db: RoomRepo, userbot: UserbotController) -> tuple[int, str]:
+    room = await room_db.get_free_room()
+    await msg.answer('Очікуйте, ми створюємо для вас кімнату...')
+    if room is None:
+        await msg.bot.send_chat_action(msg.from_user.id, ChatActions.FIND_LOCATION)
+        quantity_of_rooms = await room_db.count()
+        chat, invite_link, name = await userbot.create_new_room(quantity_of_rooms)
+        await room_db.add(chat_id=chat.id, invite_link=invite_link.invite_link, status=RoomStatusEnum.BUSY, name=name)
+        await set_new_room_commands(msg.bot, chat.id, await userbot.get_client_user_id())
+        chat_id = chat.id
+        invite_link = invite_link.invite_link
+    else:
+        await msg.bot.send_chat_action(msg.from_user.id, ChatActions.FIND_LOCATION)
+        await room_db.update_room(room.chat_id, status=RoomStatusEnum.BUSY)
+        chat_id = room.chat_id
+        invite_link = room.invite_link
+    return chat_id, invite_link

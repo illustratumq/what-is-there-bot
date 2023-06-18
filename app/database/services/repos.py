@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
 
 
 class UserRepo(BaseRepo[User]):
@@ -55,6 +55,13 @@ class DealRepo(BaseRepo[Deal]):
 
     async def get_deal_status(self, status: DealStatusEnum) -> list[Deal]:
         return await self.get_all(self.model.status == status)
+
+    async def get_deal_type(self, deal_type: DealTypeEnum, status: DealStatusEnum, user_id: int) -> list[Deal]:
+        deals = await self.get_all(self.model.type == deal_type, self.model.status == status,
+                                   self.model.customer_id == user_id)
+        deals += await self.get_all(self.model.type == deal_type, self.model.status == status,
+                                    self.model.executor_id == user_id)
+        return deals
 
     async def get_deal_customer(self, customer_id: int, status: DealStatusEnum) -> list[Deal]:
         return await self.get_all(self.model.customer_id == customer_id, self.model.status == status)

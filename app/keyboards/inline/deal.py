@@ -106,11 +106,11 @@ def join_room_kb(invite_link: str):
     )
 
 
-def to_bot_kb(url: str):
+def to_bot_kb(url: str, text: str = 'Перейти до оплати'):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[
-            [InlineKeyboardButton('Перейти до оплати', url=url)]
+            [InlineKeyboardButton(text, url=url)]
         ]
     )
 

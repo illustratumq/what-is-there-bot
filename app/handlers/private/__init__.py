@@ -12,11 +12,13 @@ from app.handlers.private import my_balance
 from app.handlers.private import pay
 from app.handlers.private import evaluate
 from app.handlers.private import back
+from app.handlers.private import new_deal
 
 
 def setup(dp: Dispatcher):
     start.setup(dp)
     post.setup(dp)
+    new_deal.setup(dp)
     participate.setup(dp)
     room.setup(dp)
     pay.setup(dp)

@@ -34,6 +34,8 @@ async def save_user_about(msg: Message, user_db: UserRepo, deal_db: DealRepo):
     await my_rating_cmd(msg, user_db, deal_db)
 
 
+# async def view_my_comments_cmd(msg: Message, deal_db: DealRepo):
+
 def setup(dp: Dispatcher):
     dp.register_message_handler(my_rating_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.to_rating, state='*')
     dp.register_message_handler(my_rating_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.my_rating, state='*')

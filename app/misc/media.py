@@ -4,16 +4,16 @@ from PIL import ImageFont, ImageDraw, Image
 
 
 def create_new_filename():
-    return f'photo_{len(os.listdir("app/data/"))+1}.png'
+    return f'app/data/photo_{len(os.listdir("app/data/"))+1}.png'
 
 def make_post_media_template(title: str, description: str, price: int, version: str = 'orig'):
     price = 'Договірна' if price == 0 else f'{price} грн.'
     logo = Image.open(f"app/data/template-{version}.png")
     font = ImageFont.truetype('calibri.ttf', 65)
     drawer = ImageDraw.Draw(logo)
-    drawer.text((50, 120), split_string(title, n=22), fill='black', font=font, stroke_width=1)
+    drawer.text((50, 110), split_string(title, 22), fill='black', font=font, stroke_width=1)
     font = ImageFont.truetype('calibri.ttf', 35)
-    y_pos = 215 + 50 * (len(title) // 23)
+    y_pos = 205 + 50 * (len(title) // 23)
     drawer.text((50, y_pos), split_string(description), fill='#afafaf', font=font)
     drawer.text((50, 500), f'Ціна: {price}', fill='#afafaf', font=font)
     new_path = create_new_filename()
@@ -45,15 +45,26 @@ def make_chat_photo_template(number: int):
     return new_path
 
 
-def split_string(string: str, n: int = 45):
-    new_string = ''
-    for word in string.split(' '):
-        if len(new_string.split('\n')[-1] + word) > n:
-            new_string += f'\n{word}'
+def split_string(text: str, max_string_length: int = 45, max_text_length: int = 255):
+    text = text.replace('\n', ' ').replace('.', '. ').replace('!', '! ').replace('?', '? ')
+    text = text.replace('.  ', '. ').replace('!  ', '! ').replace('?  ', '? ')
+    words = text.split(' ')
+    new_text = ''
+    for word, c in zip(words, range(len(words))):
+        index = 0 if c == 0 else c - 1
+        is_capitalize = any(['.' in words[index].strip(), '!' in words[index].strip(), '?' in words[index].strip()])
+        if is_capitalize:
+            word = word.capitalize()
+        if len(new_text.split('\n')[-1] + word) > max_string_length:
+            new_text += '\n' + word
         else:
-            new_string += word
-        new_string += ' '
-    return new_string
+            new_text += word
+        if len(new_text) >= max_text_length:
+            new_text += '[...]'
+            break
+        else:
+            new_text += ' '
+    return new_text
 
 
 

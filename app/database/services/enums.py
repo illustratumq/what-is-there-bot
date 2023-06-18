@@ -32,3 +32,8 @@ class DealStatusEnum(Enum):
     DISABLES = 'DISABLED'
     MODERATE = 'MODERATE'
     WAIT = 'WAIT'
+
+
+class DealTypeEnum(Enum):
+    PUBLIC = 'PUBLIC'
+    PRIVATE = 'PRIVATE'

@@ -1,7 +1,17 @@
+import os
+import sys
+
+from aiogram.utils.markdown import hide_link
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.db import models
 
-# Create your models here.
 from django.forms import ModelForm, Textarea
+from telebot import TeleBot
+from telebot.types import InputFile
+
+from app.config import Config
+from app.misc.media import make_post_media_template
 
 
 class TimeBaseModel(models.Model):
@@ -10,7 +20,7 @@ class TimeBaseModel(models.Model):
         abstract = True
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата створення')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата оновлення')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата останнього оновлення')
 
 
 class Commission(TimeBaseModel):
@@ -27,10 +37,10 @@ class Commission(TimeBaseModel):
     minimal = models.IntegerField(verbose_name='Мінімальна ціна угоди, грн')
     maximal = models.IntegerField(verbose_name='Максимальна ціна угоди, грн')
     name = models.CharField(max_length=255, verbose_name='Назва пакунку')
-    description = models.CharField(max_length=500, verbose_name='Інформація для амдіна')
+    description = models.CharField(max_length=500, verbose_name='Інформація для амдіна', null=True, blank=True)
 
     def __str__(self):
-        return f'{self.name} (ID {self.pack_id})'
+        return f'{self.name}'
 
 
 class User(TimeBaseModel):
@@ -47,7 +57,7 @@ class User(TimeBaseModel):
 
     UserTypeEnum = (
         ('ADMIN', 'Адмін'),
-        ('USER', 'Клієнт'),
+        ('USER', 'Користувач'),
         ('MODERATOR', 'Модератор'),
     )
 
@@ -61,20 +71,11 @@ class User(TimeBaseModel):
     balance = models.BigIntegerField(default=0, verbose_name='Баланс')
     description = models.CharField(max_length=500, verbose_name='Про себе', null=True, blank=True)
     ban_comment = models.CharField(max_length=500, verbose_name='Причина бану', null=True, blank=True)
-    time = models.CharField(max_length=10, null=False, default='*', verbose_name='Дозволені години')
+    time = models.CharField(max_length=10, null=False, default='*', verbose_name='Години сповіщень')
 
     def __str__(self):
         return f'{self.full_name} ({self.user_id})'
 
-
-DealStatusEnum = (
-    ('ACTIVE', 'Активний'),
-    ('BUSY', 'Виконується'),
-    ('DONE', 'Виконаний'),
-    ('DISABLED', 'Видалений'),
-    ('MODERATE', 'Модерується'),
-    ('WAIT', 'Очікує публікації')
-)
 
 class Post(TimeBaseModel):
 
@@ -83,15 +84,87 @@ class Post(TimeBaseModel):
         verbose_name = 'пост'
         verbose_name_plural = 'пости'
 
+    PostStatusEnum = (
+        ('ACTIVE', 'Активний'),
+        ('BUSY', 'Зайнятий в угоді'),
+        ('DONE', 'Завершений'),
+        ('DISABLED', 'Відхилений адміністратором'),
+        ('MODERATE', 'Очікує схвалення адміністратором'),
+        ('WAIT', 'Очікує публікації в черзі')
+    )
+
     post_id = models.BigAutoField(primary_key=True, verbose_name='Пост Id')
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='Власник', null=False, db_column='user_id')
     title = models.CharField(max_length=150, null=False, verbose_name='Заголовок')
     about = models.CharField(max_length=800, null=False, verbose_name='Опис')
     price = models.IntegerField(default=0, verbose_name='Ціна поста, грн')
-    status = models.CharField(choices=DealStatusEnum, null=False, default='MODERATE', verbose_name='Статус')
+    status = models.CharField(choices=PostStatusEnum, null=False, default='MODERATE', verbose_name='Статус')
+    message_id = models.BigIntegerField(null=True, blank=True, verbose_name='Повідомлення в основному каналі')
+    admin_message_id = models.BigIntegerField(null=True, blank=True, verbose_name='Повідомлення в адмін каналі')
+    reserv_message_id = models.BigIntegerField(null=True, blank=True, verbose_name='Повідомлення в резервному каналі')
+    post_url = models.CharField(max_length=150, null=True, blank=True, verbose_name='Посилання на пост')
+    media_url = models.CharField(max_length=150, null=True, blank=True, verbose_name='Посилання на медіа')
+
+    def delete(self, *args, **kwargs):
+        if self.status != 'BUSY':
+            config = Config.from_env()
+            bot = TeleBot(config.bot.token)
+            if self.message_id:
+                bot.delete_message(
+                    chat_id=config.misc.post_channel_chat_id, message_id=self.message_id
+                )
+            if self.reserv_message_id:
+                bot.delete_message(
+                    chat_id=config.misc.reserv_channel_id, message_id=self.reserv_message_id
+                )
+            if self.admin_message_id:
+                bot.delete_message(
+                    chat_id=config.misc.admin_channel_id, message_id=self.admin_message_id
+                )
+            bot.send_message(
+                self.user_id.user_id, f'Ваш пост {self.title}{hide_link(self.media_url)} було видалено адміністратором',
+                parse_mode='HTML'
+            )
+            return super(Post, self).delete()
+        else:
+            raise ValidationError('Цей пост неможливо видалити, оскільки він є зайнятим в угоді')
+
+    # def save(self, *args, **kwargs):
+    #     if self.status != 'BUSY':
+    #         model = Post.objects.filter(post_id=self.post_id)[0]
+    #         if any([self.title != model.title, self.about != model.about, self.price != model.price]):
+    #             config = Config.from_env()
+    #             bot = TeleBot(config.bot.token)
 
     def __str__(self):
-        return f'Пост №{self.post_id} ({self.user_id.full_name} {self.user_id.user_id})'
+        return f'Пост №{self.post_id}'
+
+
+class Room(TimeBaseModel):
+
+    class Meta:
+        db_table = 'rooms'
+        verbose_name = 'чат'
+        verbose_name_plural = 'чати'
+
+    RoomStatusEnum = (
+        ('AVAILABLE', 'Вільний'),
+        ('BUSY', 'Зайнятий')
+    )
+
+    AdminRequiredEnum = (
+        (True, 'Потрібна'),
+        (False, 'Не потрібна')
+    )
+
+    chat_id = models.BigIntegerField(primary_key=True)
+    name = models.CharField(max_length=150)
+    invite_link = models.CharField(max_length=150, unique=True, verbose_name='Запрошувальне посилання')
+    status = models.CharField(choices=RoomStatusEnum, default='AVAILABLE', null=False, verbose_name='Статус чату')
+    admin_required = models.BooleanField(default=False, choices=AdminRequiredEnum, verbose_name='Допомога в чаті')
+    admin_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Адмін чату',
+                                 db_column='admin_id')
+    reason = models.CharField(max_length=150, null=True, blank=True, verbose_name='Причина')
 
 class Deal(TimeBaseModel):
 
@@ -101,6 +174,7 @@ class Deal(TimeBaseModel):
         verbose_name_plural = 'угоди'
 
     DealRatingEnum = (
+        (None, 'Немає'),
         (1, '1'),
         (2, '2'),
         (3, '3'),
@@ -113,8 +187,19 @@ class Deal(TimeBaseModel):
         (False, 'Не підтверджена')
     )
 
+    DealStatusEnum = (
+        ('ACTIVE', 'Активна'),
+        ('BUSY', 'Виконується в чаті'),
+        ('DONE', 'Завершена'),
+        ('DISABLED', 'Відхилена адміністратором'),
+        ('MODERATE', 'Очікує схвалення поста'),
+        ('WAIT', 'Очікує публікації поста')
+    )
+
     deal_id = models.BigAutoField(primary_key=True, verbose_name='Id угоди')
     post_id = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name='Пост', null=False, db_column='post_id')
+    chat_id = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Чат угоди',
+                                db_column='chat_id')
     customer_id = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='Замовник',
                                     null=False, db_column='customer_id', related_name='customer_id')
     executor_id = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='Виконавець',
@@ -128,8 +213,8 @@ class Deal(TimeBaseModel):
                                               help_text='*Визначається автоматично')
     activity_confirm = models.BooleanField(choices=RoomActivityEnum, verbose_name='Підтвердження активності',
                                            default=True)
-    # chat_id = sa.Column(sa.BIGINT, sa.ForeignKey('rooms.chat_id', ondelete='SET NULL'), nullable=True)
-    # willing_ids = sa.Column(ARRAY(sa.BIGINT), default=[], nullable=False, )
+    willing_ids = ArrayField(ArrayField(models.CharField(blank=True)), verbose_name='',
+                             editable=False)
 
     def __str__(self):
         return f'Угода №{self.deal_id}'
@@ -140,7 +225,9 @@ class BaseForm(ModelForm):
         fields = '__all__'
 
         widgets = {
-            'description': Textarea(attrs={'cols': 100, 'rows': 3}),
-            'ban_comment': Textarea(attrs={'cols': 100, 'rows': 3}),
-            'about': Textarea(attrs={'cols': 100, 'rows': 3})
+            'description': Textarea(attrs={'cols': 41, 'rows': 3}),
+            'ban_comment': Textarea(attrs={'cols': 41, 'rows': 3}),
+            'comment': Textarea(attrs={'cols': 100, 'rows': 4}),
+            'about': Textarea(attrs={'cols': 60, 'rows': 7}),
+            'title': Textarea(attrs={'cols': 60, 'rows': 1}),
         }

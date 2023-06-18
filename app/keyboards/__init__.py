@@ -50,6 +50,8 @@ class Deal:
     confirm_activity: str = 'Так, угода акутальна'
     read_comments: str = 'Читати відгуки...'
     close: str = 'Закрити'
+    customer: str = 'Я замовник'
+    executor: str = 'Я виконавець'
 
 
 class Post:
@@ -99,6 +101,7 @@ class Commission:
 
 class AdminPost:
     delete: str = 'Видалити пост 🗑'
+    server: str = 'В адмін панель 🖥'
     delete_comment: str = 'Видалити коментар'
     delete_rating: str = 'Видалити оцінку'
     delete_force: str = 'Видалити примусово'
@@ -115,7 +118,6 @@ class Admin:
     user: str = '🗂 Юзери'
     menu: str = '🔁 В головне меню'
     edit: str = 'Редагувати'
-    add_new: str = '➕ Новий пакунок'
     cancel: str = 'Відмінити'
     to_admin: str = '◀ В адмін панель'
     to_packs: str = '◀ До пакунків'

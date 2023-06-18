@@ -3,6 +3,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import Message, ChatType
 
+from app.config import Config
 from app.database.services.repos import CommissionRepo, UserRepo
 from app.filters import IsAdminFilter
 from app.keyboards.reply.admin import admin_kb, Buttons, construct_packs_kb, keyboard_constructor, edit_commission_kb
@@ -13,9 +14,13 @@ filters = (
 )
 
 
-async def admin_cmd(msg: Message, state: FSMContext):
+async def admin_cmd(msg: Message, state: FSMContext, config: Config):
     await state.finish()
-    await msg.answer('Ви перейшли в адмін панель', reply_markup=admin_kb())
+    text = (
+        'Ви перейшли в адмін панель\n\n'
+        'Сайт: http://' + config.misc.server_host_ip + ':8000/admin'
+    )
+    await msg.answer(text, reply_markup=admin_kb())
 
 
 async def commission_cmd(msg: Message, commission_db: CommissionRepo):
@@ -107,7 +112,6 @@ async def save_parameter(msg: Message, state: FSMContext, commission_db: Commiss
         else:
             value = int(value)
     await commission_db.update_commission(data['pack_id'], **{data['parameter']: value})
-    # await select_commission_pack(msg, commission_db, user_db, state)
     await edit_commission(msg, state, commission_db)
 
 
