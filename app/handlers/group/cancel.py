@@ -178,9 +178,11 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await call.message.answer(text)
         return
     else:
-        commission = await commission_db.get_commission(customer.commission_id)
-        commission = commission.calculate_commission(deal.price)
+        executor_commission = await commission_db.get_commission(executor.commission_id)
+        customer_commission = await commission_db.get_commission(customer.commission_id)
+        commission = executor_commission.calculate_commission(deal.price)
         balance = executor.balance + deal.price - commission
+        full_commission = customer_commission.calculate_commission(deal.price) + commission
         await user_db.update_user(executor.user_id, balance=balance)
         text = (
             f'На ваш рахунок зараховано {deal.price-commission} грн. Комісія становить {commission} грн. '
@@ -234,7 +236,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             else:
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
-        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None)
+        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
 

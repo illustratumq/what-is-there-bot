@@ -73,7 +73,14 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
     if deal.type == DealTypeEnum.PUBLIC:
         message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
     await cjr.chat.pin_message(message_id=message.message_id)
-    await message.answer('Меню чату. Для повторного виклику натисніть /menu',
+    text = (
+        f'💬 Меню чату "{post.title}"\n\n'
+        f'<b>Замовник</b>: {customer.mention}\n'
+        f'<b>Виконавець</b>: {executor.mention}\n\n'
+        f'<b>Встановленна ціна:</b> {deal.construct_price()}\n'
+        f'<b>Статус угоди</b>: {deal.chat_status()}\n'
+    )
+    await message.answer(f'{text}\nДля повторного виклику натисніть /menu',
                          reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
 
 
@@ -154,7 +161,7 @@ async def call_admin_to_room_cmd(call: CallbackQuery, deal_db: DealRepo, room_db
         return
     await room_db.update_room(room.chat_id, reason='Виклик користувачем із чату', admin_required=True)
     text = await room.construct_admin_moderate_text(room_db, call.bot, config)
-    msg = await call.bot.send_message(config.misc.admin_channel_id, text,
+    msg = await call.bot.send_message(config.misc.admin_help_channel_id, text,
                                       reply_markup=await help_admin_kb(deal.deal_id))
     await room_db.update_room(room.chat_id, message_id=msg.message_id)
     await call.message.answer('Адміністратора було викликано у чат! Зачекайте, він невдовзі приєднається')

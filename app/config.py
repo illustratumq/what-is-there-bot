@@ -56,6 +56,7 @@ class Miscellaneous:
     server_host_ip: str
     media_channel_chat_id: int
     post_channel_chat_id: int
+    admin_help_channel_id: int
     admin_channel_id: int
     reserv_channel_id: int
     update_commands: bool
@@ -103,6 +104,7 @@ class Config:
                 post_channel_chat_id=env.int('POST_CHANNEL_CHAT_ID'),
                 update_commands=env.bool('UPDATE_COMMANDS', True),
                 admin_channel_id=env.int('ADMIN_CHANNEL_ID'),
+                admin_help_channel_id=env.int('ADMIN_HELP_CHANNEL_ID'),
                 reserv_channel_id=env.int('RESERV_CHANNEL_ID'),
                 timezone=env.str('TIMEZONE'),
                 server_host_ip=env.str('SERVER_HOST_IP')

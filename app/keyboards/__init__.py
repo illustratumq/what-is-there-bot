@@ -113,6 +113,7 @@ class Admin:
     post = AdminPost()
     commission_edit = Commission()
     statistic: str = '📊 Статистика'
+    dates: str = 'Ввести період статистики'
     commission: str = '💵 Комісія'
     setting: str = '⚙ Налаштування'
     user: str = '🗂 Юзери'

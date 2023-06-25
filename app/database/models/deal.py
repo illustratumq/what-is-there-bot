@@ -15,6 +15,7 @@ class Deal(TimedBaseModel):
 
     price = sa.Column(sa.INTEGER, default=0, nullable=False)
     payed = sa.Column(sa.INTEGER, default=0, nullable=False)
+    commission = sa.Column(sa.INTEGER, default=0, nullable=False)
     status = sa.Column(ENUM(DealStatusEnum), default=DealStatusEnum.MODERATE, nullable=False)
     type = sa.Column(ENUM(DealTypeEnum), default=DealTypeEnum.PUBLIC, nullable=False)
     rating = sa.Column(sa.INTEGER, nullable=True)

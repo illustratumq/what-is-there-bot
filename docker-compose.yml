@@ -1,6 +1,7 @@
 version: "3.7"
 
 services:
+
   django:
     container_name: "django-admin-site"
     build:
