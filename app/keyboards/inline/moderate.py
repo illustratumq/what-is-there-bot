@@ -1,8 +1,9 @@
-from app.database.models import Post, User
+from app.database.models import Post, User, Deal
 from app.keyboards.inline.base import *
 
 moderate_post_cb = CallbackData('mp', 'post_id', 'action', 'admin_id')
 public_post_cb = CallbackData('pb', 'admin_id', 'delay', 'action', 'post_id')
+comment_deal_cb = CallbackData('cmd', 'action', 'deal_id', 'sort')
 
 
 def public_all_post_cb(admin: User, post: Post, current_delay: int):
@@ -62,3 +63,30 @@ def confirm_post_moderate(action: str, post: Post, admin: User):
             [InlineKeyboardButton(Buttons.post.back, callback_data=button_cb('back'))]
         ]
     )
+
+def comment_deal_kb(deals: list[Deal], deal_id: int, sort: str = 'default'):
+    deals = [deal.deal_id for deal in deals]
+    current_index = deals.index(deal_id)
+    next_deal_id = deals[(current_index + 1) % len(deals)]
+    prev_deal_id = deals[(current_index - 1) % len(deals)]
+
+    def button_cb(current_deal_id: int, action: str):
+        return dict(
+            callback_data=comment_deal_cb.new(deal_id=current_deal_id, action=action, sort=sort)
+        )
+
+    sort_type_text = {
+        'default': 'Вимк', 'max': 'Найкращі', 'min': 'Найгірші'
+    }
+
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.deal.sort.format(sort_type_text[sort]),
+                              **button_cb(deal_id, action='sort_switch'))],
+        [
+            InlineKeyboardButton('◀', **button_cb(prev_deal_id, 'pag')),
+            InlineKeyboardButton('Назад', **button_cb(deal_id, 'cancel')),
+            InlineKeyboardButton('▶', **button_cb(next_deal_id, 'pag'))
+        ]
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)

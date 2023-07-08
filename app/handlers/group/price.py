@@ -58,8 +58,8 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
             user = await user_db.get_user(deal.customer_id)
         else:
             user = await user_db.get_user(deal.executor_id)
-        await msg.reply(f'Ви становили ціну - {new_price} грн. {user.mention}, відправте таке ж саме число, '
-                        f'щоб підтвердити зміну ціни.', reply_markup=back_chat_kb(deal))
+        await msg.answer(f'{user.mention}, відправте таке ж саме число, '
+                         f'щоб підтвердити зміну ціни.', reply_markup=back_chat_kb(deal))
     elif customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
         customer = await user_db.get_user(deal.customer_id)
         await apply_new_price(msg, deal_db, deal, state, customer, new_price)

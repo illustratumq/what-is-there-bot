@@ -1,7 +1,9 @@
 import logging
+import os
 from datetime import timedelta, datetime
 
 from aiogram import Bot
+from aiogram.types import InputFile
 from apscheduler_di import ContextSchedulerDecorator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -9,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import Config
 from app.database.services.enums import DealStatusEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
+from app.handlers.admin.database import save_database
 from app.handlers.group.cancel import cancel_deal_processing
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import confirm_deal_activity
@@ -45,6 +48,9 @@ log = logging.getLogger(__name__)
 
 
 def setup_cron_function(scheduler: ContextSchedulerDecorator):
+    scheduler.add_job(
+        func=send_database, trigger='interval', seconds=10, name='Бекап бази даних'
+    )
     # scheduler.add_job(
     #     func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
     # )
@@ -76,3 +82,8 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                 await cancel_deal_processing(bot, deal, post, customer, None, db.deal_db, db.post_db, db.user_db,
                                              db.room_db, userbot, config, message=message, reset_state=False)
 
+async def send_database(session: sessionmaker, bot: Bot, config: Config):
+    db = database(session)
+    path = await save_database(db.user_db, db.deal_db, db.post_db, db.room_db)
+    await bot.send_document(chat_id=config.misc.database_channel_id, document=InputFile(path))
+    os.remove(path)

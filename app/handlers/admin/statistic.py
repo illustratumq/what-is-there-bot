@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Command
 from aiogram.types import Message, InputFile
 from matplotlib.axes import Axes
+from scipy import interpolate
 
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import DealStatusEnum
@@ -17,7 +17,6 @@ from app.keyboards import Buttons
 from app.keyboards.reply.menu import basic_kb
 from app.misc.times import localize, now
 
-from scipy import interpolate
 
 async def admin_statistic_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo, state: FSMContext):
     msg = await msg.answer('Збираю статистику...')
@@ -39,7 +38,6 @@ async def admin_statistic_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo
             now().strptime(data['dates'].split('-')[0].strip(), '%d.%m.%y'),
             now().strptime(data['dates'].split('-')[1].strip(), '%d.%m.%y')
         )
-        print(dates[0], dates[1])
     else:
         dates = (now() - timedelta(days=7), now())
 
@@ -75,15 +73,15 @@ async def input_statistic_dates(msg: Message, state: FSMContext):
 async def save_statistic_states(msg: Message, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo,
                                 state: FSMContext):
     dates = msg.text
-    # try:
-    dates = (
-        now().strptime(dates.split('-')[0].strip(), '%d.%m.%y'),
-        now().strptime(dates.split('-')[1].strip(), '%d.%m.%y')
-    )
-    await state.update_data(dates=msg.text)
-    await admin_statistic_cmd(msg, deal_db, post_db, user_db, state)
-    # except:
-    #     await msg.answer('Щось пішло не так, спробуйте ще раз')
+    try:
+        dates = (
+            now().strptime(dates.split('-')[0].strip(), '%d.%m.%y'),
+            now().strptime(dates.split('-')[1].strip(), '%d.%m.%y')
+        )
+        await state.update_data(dates=msg.text)
+        await admin_statistic_cmd(msg, deal_db, post_db, user_db, state)
+    except:
+        await msg.answer('Щось пішло не так, спробуйте ще раз')
 
 
 def setup(dp: Dispatcher):
@@ -101,8 +99,6 @@ async def admin_statistic_users(ax: Axes, users: list[UserRepo.model], dates: tu
         users_sum.append(user_day)
         x_ticks_date.append(day.strftime('%d.%m.%y'))
     x_ticks_date_range = np.arange(len(x_ticks_date))
-    users_sum = [random.randint(3, 70) for i in range(len(x_ticks_date))]
-
     f = interpolate.interp1d(x_ticks_date_range, users_sum, kind='quadratic')
     x_new = np.linspace(x_ticks_date_range[0], x_ticks_date_range[-1], 1000)
     y_new = f(x_new)
@@ -130,8 +126,8 @@ async def admin_statistic_posts(ax: Axes, posts: list[PostRepo.model], deals: li
         deals_sum.append(deals_day)
         x_ticks_date.append(day.strftime('%d.%m.%y'))
     x_ticks_date_range = np.arange(len(x_ticks_date))
-    posts_sum = [random.randint(1, 100) for i in range(len(x_ticks_date))]
-    deals_sum = [random.randint(3, 70) for i in range(len(x_ticks_date))]
+    # posts_sum = [random.randint(1, 100) for i in range(len(x_ticks_date))]
+    # deals_sum = [random.randint(3, 70) for i in range(len(x_ticks_date))]
 
     f = interpolate.interp1d(x_ticks_date_range, posts_sum, kind='quadratic')
     x_new = np.linspace(x_ticks_date_range[0], x_ticks_date_range[-1], 1000)
@@ -166,8 +162,8 @@ async def admin_statistic_finance(axes: [Axes, Axes], deals: list[DealRepo.model
         commission_sum.append(commission)
         price_sum.append(price)
     x_ticks_date_range = np.arange(len(x_ticks_date))
-    commission_sum = [random.randint(5, 500) for i in range(len(x_ticks_date))]
-    price_sum = [random.randint(30, 1000) for i in range(len(x_ticks_date))]
+    # commission_sum = [random.randint(5, 500) for i in range(len(x_ticks_date))]
+    # price_sum = [random.randint(30, 1000) for i in range(len(x_ticks_date))]
     axes[0].bar(x_ticks_date_range, commission_sum, width=0.25, color='#2CEA75', edgecolor='black', linewidth=1.2,
                 zorder=2, label='Комісія')
     axes[0].bar(x_ticks_date_range + 0.25, price_sum, width=0.25, color='#2E79EA', edgecolor='black', linewidth=1.2,

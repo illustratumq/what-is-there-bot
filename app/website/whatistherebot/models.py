@@ -205,6 +205,7 @@ class Deal(TimeBaseModel):
     executor_id = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='Виконавець',
                                     null=True, db_column='executor_id', related_name='executor_id', blank=True)
     price = models.IntegerField(default=0, verbose_name='Ціна угоди, грн')
+    commission = models.IntegerField(verbose_name='Комісія сервісу, грн', editable=False)
     payed = models.IntegerField(default=0, verbose_name='Оплачено, грн')
     status = models.CharField(choices=DealStatusEnum, verbose_name='Статус', default='MODERATE')
     rating = models.IntegerField(choices=DealRatingEnum, verbose_name='Рейтингова оцінка', null=True, blank=True)

@@ -92,6 +92,7 @@ class DealAdmin(admin.ModelAdmin):
     list_display = ('__str__',  'status', 'view_post_link', 'view_customer_link', 'view_executor_link', 'updated_at')
     search_fields = ('customer_id__startswith', 'executor_id__startswith', 'deal_id__startswith')
     ordering = ['-updated_at']
+    readonly_fields = ('commission', )
     autocomplete_fields = ('post_id', 'executor_id', 'customer_id', 'chat_id')
 
     def view_post_link(self, obj):
@@ -124,7 +125,7 @@ class DealAdmin(admin.ModelAdmin):
             'fields': ('post_id', 'customer_id', 'executor_id', 'chat_id')
         }),
         ('Статус та ціна', {
-            'fields': ('price', 'payed', 'status'),
+            'fields': ('commission', 'price', 'payed', 'status'),
         }),
         ('Оцінка', {
             'fields': ('rating', 'comment')
