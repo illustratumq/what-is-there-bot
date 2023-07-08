@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 
 def setup_cron_function(scheduler: ContextSchedulerDecorator):
     scheduler.add_job(
-        func=send_database, trigger='interval', seconds=10, name='Бекап бази даних'
+        func=send_database, trigger='interval', seconds=60*60, name='Бекап бази даних'
     )
     # scheduler.add_job(
     #     func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
