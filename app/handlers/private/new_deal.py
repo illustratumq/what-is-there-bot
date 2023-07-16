@@ -12,20 +12,11 @@ from app.keyboards.reply.menu import basic_kb
 from app.states.states import PrivateDealSG
 
 
-async def create_new_deal_cmd(msg: Message, deal_db: DealRepo, state: FSMContext):
-    deals = await deal_db.get_deal_type(DealTypeEnum.PRIVATE, DealStatusEnum.ACTIVE, msg.from_user.id)
-    if deals:
-        deal = deals[0]
-        await state.update_data(role='executor' if deal.executor_id == msg.from_user.id else 'customer')
-        await msg.answer('Перешли наступне повідомлення іншому учаснику, для того щоб розпочати',
-                         reply_markup=basic_kb([Buttons.menu.back]))
-        await new_deal_invite_msg(msg, deal, state)
-        await state.finish()
-    else:
-        await msg.answer(
-            'Для того щоб створити приватну угоду, обери свою роль у ній',
-            reply_markup=basic_kb([[Buttons.deal.customer], [Buttons.deal.executor], [Buttons.menu.back]]))
-        await PrivateDealSG.SelectRole.set()
+async def create_new_deal_cmd(msg: Message):
+    await msg.answer(
+        'Для того щоб створити приватну угоду, обери свою роль у ній',
+        reply_markup=basic_kb([[Buttons.deal.customer], [Buttons.deal.executor], [Buttons.menu.back]]))
+    await PrivateDealSG.SelectRole.set()
 
 
 async def new_deal_invite_msg(msg: Message, deal: DealRepo.model, state: FSMContext):
@@ -43,6 +34,16 @@ async def new_deal_invite_msg(msg: Message, deal: DealRepo.model, state: FSMCont
 async def save_deal_role(msg: Message, deal_db: DealRepo, post_db: PostRepo, state: FSMContext):
     role = 'executor' if msg.text == Buttons.deal.executor else 'customer'
     await state.update_data(role=role)
+
+    deals = await deal_db.get_deal_type(DealTypeEnum.PRIVATE, DealStatusEnum.ACTIVE, msg.from_user.id)
+    if deals:
+        for deal in deals:
+            if (deal.executor_id and role == 'executor') or (deal.customer_id and role == 'customer'):
+                await msg.answer('Перешли наступне повідомлення іншому учаснику, для того щоб розпочати',
+                                 reply_markup=basic_kb([Buttons.menu.back]))
+                await new_deal_invite_msg(msg, deal, state)
+                await state.finish()
+                return
     deal = await deal_db.add(**{role + '_id': msg.from_user.id}, type=DealTypeEnum.PRIVATE,
                              status=DealStatusEnum.ACTIVE)
     post = await post_db.add(

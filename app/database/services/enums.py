@@ -5,7 +5,6 @@ class UserStatusEnum(Enum):
     ACTIVE = 'ACTIVE'
     BANNED = 'BANNED'
 
-
 class UserTypeEnum(Enum):
     USER = 'USER'
     MODERATOR = 'MODERATOR'

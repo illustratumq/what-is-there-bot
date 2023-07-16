@@ -48,6 +48,10 @@ async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo):
         await msg.answer(greeting_text, reply_markup=menu_kb())
         await state.finish()
 
+async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
+    await state.finish()
+    user = await user_db.get_user(msg.from_user.id)
+    await msg.answer('Ви відмінили дію', reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
                           state: FSMContext):
@@ -64,9 +68,9 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
     elif deal.customer_id == msg.from_user.id:
         await msg.answer('Ви не можете долучитися до свого завдання')
         return
-    # elif msg.from_user.id in deal.willing_ids:
-    #     await msg.answer('Ви вже відправили запит на це завдання')
-    #     return
+    elif msg.from_user.id in deal.willing_ids:
+        await msg.answer('Ви вже відправили запит на це завдання')
+        return
     text = (
         f'Ви хочете стати виконавцем завдання.\n\n'
         f'Для цього, надішліть коментар, який побачить замовник у Вашому запиті, і натисніть кнопку '
@@ -107,7 +111,7 @@ async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, p
 
 
 async def manage_post_cmd(msg: Message, deep_link: re.Match, post_db: PostRepo,
-                          user_db: UserRepo, room_db: RoomRepo, deal_db: DealRepo, config: Config):
+                          user_db: UserRepo, room_db: RoomRepo, deal_db: DealRepo):
     await msg.delete()
     post_id = int(deep_link.groups()[-1])
     post = await post_db.get_post(post_id)
@@ -164,10 +168,11 @@ def setup(dp: Dispatcher):
         manage_post_cmd, IsAdminFilter(), ChatTypeFilter(ChatType.PRIVATE), CommandStart(MANAGE_POST_REGEX), state='*')
     dp.register_message_handler(
         confirm_private_deal_cmd, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PRIVATE_DEAL_REGEX), state='*')
+    dp.register_message_handler(cancel_action_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.action.cancel,
+                                state='*')
     dp.register_message_handler(start_cmd, CommandStart(), ChatTypeFilter(ChatType.PRIVATE), state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.admin.menu, state='*')
     dp.register_message_handler(start_cmd, Command('menu'), ChatTypeFilter(ChatType.PRIVATE), state='*')
-    dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.action.cancel, state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.back, state='*')
 
 

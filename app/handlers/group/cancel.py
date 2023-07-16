@@ -128,20 +128,21 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     if reset_state:
         await state.storage.reset_data(chat=deal.chat_id, user=deal.customer_id)
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
-    # await userbot.clean_chat_history(chat_id=deal.chat_id)
+
+    await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
     room = await room_db.get_room(deal.chat_id)
     for user_id in deal.participants:
         try:
-            print(f'{deal.chat_id=}, {user_id}')
-            await bot.kick_chat_member(chat_id=deal.chat_id, user_id=user_id)
-        except Exception as err:
-            log.warning(f'Помилка в чаті: {err}')
-
+            if user_id != await userbot.get_client_user_id():
+                await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
+        except Exception as error:
+            log.error(str(error) + f'\n{deal.deal_id=}')
     if room.admin_id:
         try:
-            await userbot.kick_chat_member(deal.chat_id, room.admin_id)
-        except:
-            pass
+            if room.admin_id != await userbot.get_client_user_id():
+                await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
+        except Exception as error:
+            log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
 
     if deal.type == DealTypeEnum.PRIVATE:
         if deal.customer_id == post.user_id:
@@ -218,17 +219,19 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
                 )
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
+
+        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
         for user_id in deal.participants:
             try:
-                await call.bot.kick_chat_member(chat_id=deal.chat_id, user_id=user_id)
-            except Exception as err:
-                log.warning(f'Помилка в чаті: {err}')
-
+                if user_id != await userbot.get_client_user_id():
+                    await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
+            except Exception as error:
+                log.error(str(error) + f'\n{deal.deal_id=}')
         if room.admin_id:
             try:
-                await call.bot.kick_chat_member(call.message.chat.id, user_id=room.admin_id)
-            except ChatAdminRequired:
-                pass
+                await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
+            except Exception as error:
+                log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
 
         if deal.type == DealTypeEnum.PRIVATE:
             if deal.customer_id == post.user_id:
@@ -236,7 +239,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             else:
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
-        await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE, chat_id=None, commission=full_commission)
+        await deal_db.update_deal(deal.deal_id, chat_id=None, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
 
@@ -284,7 +287,7 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
                                   commission_db: CommissionRepo, config: Config):
     deal = await deal_db.get_deal_chat(msg.chat.id)
-    if deal:
+    if deal and deal.status != DealStatusEnum.DONE:
         customer = await user_db.get_user(deal.customer_id)
         post = await post_db.get_post(deal.post_id)
         user = 'Замовник' if msg.from_user.id == customer.user_id else 'Виконавець'

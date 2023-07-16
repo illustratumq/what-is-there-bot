@@ -10,8 +10,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
-from app.handlers.admin.database import save_database
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, MarkerRepo, SettingRepo
+from app.handlers.admin.database import save_database, save_database_json
 from app.handlers.group.cancel import cancel_deal_processing
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import confirm_deal_activity
@@ -39,6 +39,18 @@ class database:
     def room_db(self):
         return RoomRepo(self.session)
 
+    @property
+    def commission_db(self):
+        return CommissionRepo(self.session)
+
+    @property
+    def marker_db(self):
+        return MarkerRepo(self.session)
+
+    @property
+    def setting_db(self):
+        return SettingRepo(self.session)
+
     async def close(self):
         await self.session.commit()
         await self.session.close()
@@ -49,7 +61,7 @@ log = logging.getLogger(__name__)
 
 def setup_cron_function(scheduler: ContextSchedulerDecorator):
     scheduler.add_job(
-        func=send_database, trigger='interval', seconds=60*60, name='Бекап бази даних'
+        func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     )
     # scheduler.add_job(
     #     func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
@@ -80,10 +92,15 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                 )
                 bot.set_current(bot)
                 await cancel_deal_processing(bot, deal, post, customer, None, db.deal_db, db.post_db, db.user_db,
-                                             db.room_db, userbot, config, message=message, reset_state=False)
+                                             db.room_db, db.commission_db, userbot, config, message=message,
+                                             reset_state=False)
 
 async def send_database(session: sessionmaker, bot: Bot, config: Config):
     db = database(session)
     path = await save_database(db.user_db, db.deal_db, db.post_db, db.room_db)
+    await bot.send_document(chat_id=config.misc.database_channel_id, document=InputFile(path))
+    os.remove(path)
+    path = await save_database_json(db.user_db, db.deal_db, db.post_db, db.room_db, db.commission_db,
+                                    db.marker_db, db.setting_db)
     await bot.send_document(chat_id=config.misc.database_channel_id, document=InputFile(path))
     os.remove(path)
