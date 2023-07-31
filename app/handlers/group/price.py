@@ -1,12 +1,15 @@
 import re
+import time
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import ChatTypeFilter
+from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.deep_linking import get_start_link
 
+from app.config import Config
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo
+from app.fondy.api import FondyApiWrapper
 from app.keyboards.inline.chat import room_cb, back_chat_kb
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import pay_deal_kb

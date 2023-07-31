@@ -5,3 +5,4 @@ from app.database.models.room import Room
 from app.database.models.marker import Marker
 from app.database.models.commission import Commission
 from app.database.models.setting import Setting
+from app.database.models.order import Order

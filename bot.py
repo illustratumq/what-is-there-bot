@@ -10,6 +10,7 @@ from aiogram.types import ParseMode, AllowedUpdates, BotCommand
 from app import handlers, middlewares
 from app.config import Config
 from app.database.services.db_engine import create_db_engine_and_session_pool
+from app.fondy.api import FondyApiWrapper
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
@@ -46,7 +47,8 @@ async def main():
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
     userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
-    scheduler = compose_scheduler(config, bot, sqlalchemy_session, userbot)
+    fondy = FondyApiWrapper(config)
+    scheduler = compose_scheduler(config, bot, sqlalchemy_session, userbot, fondy)
 
     allowed_updates = (
             AllowedUpdates.MESSAGE + AllowedUpdates.CALLBACK_QUERY +
@@ -54,7 +56,7 @@ async def main():
             AllowedUpdates.PRE_CHECKOUT_QUERY + AllowedUpdates.SHIPPING_QUERY
     )
 
-    environments = dict(config=config, dp=dp, scheduler=scheduler, userbot=userbot)
+    environments = dict(config=config, dp=dp, scheduler=scheduler, userbot=userbot, fondy=fondy)
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
     setup_cron_function(scheduler)

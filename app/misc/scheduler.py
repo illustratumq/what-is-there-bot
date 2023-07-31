@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from tzlocal import get_localzone
 
 from app.config import Config
+from app.fondy.api import FondyApiWrapper
 from app.handlers.userbot import UserbotController
 
 
@@ -19,12 +20,14 @@ def _configure_executors() -> dict[str, BaseExecutor]:
 
 
 def compose_scheduler(config: Config, bot: Bot, session: sessionmaker,
-                      userbot: UserbotController) -> ContextSchedulerDecorator:
+                      userbot: UserbotController,
+                      fondy: FondyApiWrapper) -> ContextSchedulerDecorator:
     scheduler = ContextSchedulerDecorator(AsyncIOScheduler(
         executors=_configure_executors(),
         timezone=str(get_localzone())
     ))
     scheduler.ctx.add_instance(bot, Bot)
+    scheduler.ctx.add_instance(fondy, FondyApiWrapper)
     scheduler.ctx.add_instance(session, sessionmaker)
     scheduler.ctx.add_instance(config, Config)
     scheduler.ctx.add_instance(userbot, UserbotController)

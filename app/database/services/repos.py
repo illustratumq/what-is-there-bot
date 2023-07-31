@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, OrderStatusEnum
 
 
 class UserRepo(BaseRepo[User]):
@@ -159,3 +159,22 @@ class CommissionRepo(BaseRepo[Commission]):
 
     async def delete_commission(self, pack_id: int):
         return await self.delete(self.model.pack_id == pack_id)
+
+
+class OrderRepo(BaseRepo[Order]):
+    model = Order
+
+    async def get_order(self, order_id: int) -> Order:
+        return await self.get_one(self.model.id == order_id)
+
+    async def get_orders_status(self, status: OrderStatusEnum) -> list[Order]:
+        return await self.get_all(self.model.status == status)
+
+    async def get_order_deal(self, deal_id: int) -> Order:
+        return await self.get_one(self.model.deal_id == deal_id)
+
+    async def update_order(self, order_id: int, **kwargs) -> None:
+        return await self.update(self.model.id == order_id, **kwargs)
+
+    async def delete_order(self, order_id: int):
+        return await self.delete(self.model.id == order_id)

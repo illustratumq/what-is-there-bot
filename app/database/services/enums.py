@@ -36,3 +36,10 @@ class DealStatusEnum(Enum):
 class DealTypeEnum(Enum):
     PUBLIC = 'PUBLIC'
     PRIVATE = 'PRIVATE'
+
+
+class OrderStatusEnum(Enum):
+    CREATED = 'CREATED'
+    PREPARING = 'PREPARING'
+    SUCCESSFUL = 'SUCCESSFUL'
+    FAILURE = 'FAILURE'

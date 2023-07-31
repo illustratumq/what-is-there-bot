@@ -1,13 +1,17 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType
+from aiogram.utils.markdown import hide_link
 
-from app.database.services.repos import DealRepo, PostRepo, UserRepo, CommissionRepo
+from app.database.services.enums import OrderStatusEnum
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, CommissionRepo, OrderRepo
+from app.fondy.api import FondyApiWrapper
+from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import confirm_pay_kb, pay_cb, pay_deal_kb
 
 
-async def confirm_pay_deal_from_balance(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                                        user_db: UserRepo, commission_db: CommissionRepo):
+async def confirm_pay_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
+                           user_db: UserRepo, commission_db: CommissionRepo):
     await call.message.delete()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
@@ -16,12 +20,37 @@ async def confirm_pay_deal_from_balance(call: CallbackQuery, callback_data: dict
     user = await user_db.get_user(call.from_user.id)
     commission = await commission_db.get_commission(user.commission_id)
     commission = commission.calculate_commission(need_to_pay)
+    pay_method = 'з балансу' if callback_data['action'] == 'pay_from_balance' else 'через платіжну систему'
     text = (
-        f'Ви бажаєте оплатити угоду "{post.title}" у розмірі {need_to_pay + commission} грн '
-        f'({need_to_pay} + {commission} комісія) з вашого балансу, будь-ласка підтвердіть своє рішення.'
+        f'Ви бажаєте оплатити угоду "{post.title}" у розмірі {need_to_pay + commission} грн'
+        f', будь-ласка підтвердіть своє рішення.'
     )
     await call.message.answer(text, reply_markup=confirm_pay_kb(deal, callback_data['action']))
 
+
+async def pay_from_fondy_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
+                             user_db: UserRepo, commission_db: CommissionRepo, fondy: FondyApiWrapper,
+                             order_db: OrderRepo):
+    deal_id = int(callback_data['deal_id'])
+    deal = await deal_db.get_deal(deal_id)
+    need_to_pay = deal.price - deal.payed
+    customer = await user_db.get_user(deal.customer_id)
+    commission = await commission_db.get_commission(customer.commission_id)
+    commission = commission.calculate_commission(need_to_pay)
+    order = await order_db.get_order_deal(deal.deal_id)
+    # print(order, order.status, order.url)
+    if order and order.status == OrderStatusEnum.PREPARING and order.url:
+        url = order.url
+    else:
+        response, order = await fondy.create_order(deal, user_db, post_db, order_db, need_to_pay + commission)
+        if response['response']['response_status'] != 'success':
+            await call.message.answer(response)
+            return
+        url = response['response']['checkout_url']
+        await order_db.update_order(order.id, status=OrderStatusEnum.PREPARING, url=url)
+    await call.message.delete()
+    await call.message.answer(f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}',
+                              reply_markup=to_bot_kb(url=url, text='Оплатити'))
 
 async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
                                user_db: UserRepo, commission_db: CommissionRepo):
@@ -95,8 +124,13 @@ async def back_to_pay_method(call: CallbackQuery, callback_data: dict, deal_db: 
 
 def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
-        confirm_pay_deal_from_balance, ChatTypeFilter(ChatType.PRIVATE), pay_cb.filter(action='pay_from_balance'),
-        state='*')
+        confirm_pay_deal, ChatTypeFilter(ChatType.PRIVATE), pay_cb.filter(action=['pay_from_balance', 'pay_fully']),
+        state='*'),
+    # dp.register_callback_query_handler(
+    #     confirm_pay_deal, ChatTypeFilter(ChatType.PRIVATE), pay_cb.filter(action='pay_fully'),
+    #     state='*')
+    dp.register_callback_query_handler(
+        pay_from_fondy_cmd, ChatTypeFilter(ChatType.PRIVATE), pay_cb.filter(action='conf_pay_fully'), state='*')
     dp.register_callback_query_handler(
         back_to_pay_method, ChatTypeFilter(ChatType.PRIVATE), pay_cb.filter(action='cancel_pay'), state='*')
     dp.register_callback_query_handler(
