@@ -11,6 +11,7 @@ from app.config import Config
 from app.database.services.enums import DealStatusEnum, UserTypeEnum, RoomStatusEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo
 from app.filters import IsAdminFilter
+from app.handlers.private.room import get_room
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.admin import manage_post_kb
@@ -35,17 +36,18 @@ greeting_text = (
         '<b>Сповіщення 🔔</b> -  Налаштувати сповіщення про нові пости на каналі.\n\n'
         'Якщо у вас є питання щодо реклами, співпраці або будь-яких інших питань, '
         'а також ідеї покращення сервісу, ви можете зв\'язатися з адміністрацією '
-        'написавши сюди @AShoTam_Bot'
-    )
+        'написавши сюди {}'
+)
 
 
 async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo):
+    bot = (await msg.bot.me).username
     if not msg.from_user.is_bot:
         user = await user_db.get_user(msg.from_user.id)
-        await msg.answer(greeting_text if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню',
-                         reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
+        text = greeting_text.format(bot) if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню'
+        await msg.answer(text, reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
     else:
-        await msg.answer(greeting_text, reply_markup=menu_kb())
+        await msg.answer(greeting_text.format(bot), reply_markup=menu_kb())
         await state.finish()
 
 async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
@@ -131,7 +133,7 @@ async def manage_post_cmd(msg: Message, deep_link: re.Match, post_db: PostRepo,
 
 
 async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, room_db: RoomRepo,
-                                   userbot: UserbotController):
+                                   userbot: UserbotController, user_db: UserRepo, state: FSMContext):
     await msg.delete()
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
@@ -143,21 +145,26 @@ async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: D
         return
     await msg.answer('🎉 Вітаємо. Ви стали 2-им учасником приватної угоди')
     role = 'customer_id' if deal.executor_id else 'executor_id'
-    room_chat_id, invite_link = await get_room(msg, room_db, userbot)
+    room_chat_id, invite_link = await get_room(msg, msg.from_user.id, room_db, userbot)
     await deal_db.update_deal(
         deal_id, chat_id=room_chat_id, **{role: msg.from_user.id},
-        next_activity_date=datetime.now() + timedelta(minutes=1)
+        next_activity_date=datetime.now() + timedelta(minutes=1), status=DealStatusEnum.BUSY
     )
     text = (
-        f'Приватна угода з {msg.from_user.full_name} ухвалена. Заходьте до кімнати за цим посиланням:\n\n'
+        'Приватна угода з {} ухвалена. Заходьте до кімнати за цим посиланням:\n\n'
         f'{invite_link}\n\nАбо натисніть на кнопку під цим повідомленням'
     )
     deal = await deal_db.get_deal(deal_id)
-    await msg.bot.send_message(
-        deal.customer_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
-    await msg.bot.send_message(
-        deal.executor_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
-
+    customer = await user_db.get_user(deal.customer_id)
+    executor = await user_db.get_user(deal.executor_id)
+    customer_msg = await msg.bot.send_message(deal.customer_id, text=text.format(executor.full_name),
+                                              reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
+    executor_msg = await msg.bot.send_message(deal.executor_id, text=text.format(customer.full_name),
+                                              reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
+    await state.storage.update_data(
+        chat=room_chat_id, user=deal.executor_id, last_msg_id=executor_msg.message_id)
+    await state.storage.update_data(
+        chat=room_chat_id, user=deal.customer_id, last_msg_id=customer_msg.message_id)
 
 def setup(dp: Dispatcher):
     dp.register_message_handler(
@@ -174,22 +181,3 @@ def setup(dp: Dispatcher):
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.admin.menu, state='*')
     dp.register_message_handler(start_cmd, Command('menu'), ChatTypeFilter(ChatType.PRIVATE), state='*')
     dp.register_message_handler(start_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.back, state='*')
-
-
-async def get_room(msg: Message, room_db: RoomRepo, userbot: UserbotController) -> tuple[int, str]:
-    room = await room_db.get_free_room()
-    await msg.answer('Очікуйте, ми створюємо для вас кімнату...')
-    if room is None:
-        await msg.bot.send_chat_action(msg.from_user.id, ChatActions.FIND_LOCATION)
-        quantity_of_rooms = await room_db.count()
-        chat, invite_link, name = await userbot.create_new_room(quantity_of_rooms)
-        await room_db.add(chat_id=chat.id, invite_link=invite_link.invite_link, status=RoomStatusEnum.BUSY, name=name)
-        await set_new_room_commands(msg.bot, chat.id, await userbot.get_client_user_id())
-        chat_id = chat.id
-        invite_link = invite_link.invite_link
-    else:
-        await msg.bot.send_chat_action(msg.from_user.id, ChatActions.FIND_LOCATION)
-        await room_db.update_room(room.chat_id, status=RoomStatusEnum.BUSY)
-        chat_id = room.chat_id
-        invite_link = room.invite_link
-    return chat_id, invite_link

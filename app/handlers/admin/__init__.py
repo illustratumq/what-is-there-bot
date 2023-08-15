@@ -1,6 +1,6 @@
 from aiogram import Dispatcher
 
-from app.handlers.admin import post, panel, edit_post, statistic, database
+from app.handlers.admin import post, panel, edit_post, statistic, database, users
 
 
 def setup(dp: Dispatcher):
@@ -9,3 +9,5 @@ def setup(dp: Dispatcher):
     edit_post.setup(dp)
     statistic.setup(dp)
     database.setup(dp)
+    users.setup(dp)
+

@@ -21,6 +21,7 @@ class Deal(TimedBaseModel):
     rating = sa.Column(sa.INTEGER, nullable=True)
     comment = sa.Column(sa.VARCHAR(500), nullable=True)
 
+    is_template_photo = sa.Column(sa.BOOLEAN, default=False, nullable=False)
     next_activity_date = sa.Column(sa.DateTime, nullable=True)
     activity_confirm = sa.Column(sa.BOOLEAN, default=True, nullable=False)
 

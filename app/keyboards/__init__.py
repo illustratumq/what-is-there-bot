@@ -122,6 +122,7 @@ class Admin:
     cancel: str = 'Відмінити'
     to_admin: str = '◀ В адмін панель'
     to_packs: str = '◀ До пакунків'
+    user_detail: str = 'Переглянути всю інформацію'
 
 
 class Buttons:

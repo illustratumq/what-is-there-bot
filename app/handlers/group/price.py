@@ -1,15 +1,12 @@
 import re
-import time
 
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import ChatTypeFilter, Command
+from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.deep_linking import get_start_link
 
-from app.config import Config
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo
-from app.fondy.api import FondyApiWrapper
 from app.keyboards.inline.chat import room_cb, back_chat_kb
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import pay_deal_kb
@@ -125,27 +122,27 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
     )
     await call.message.delete()
     await call.bot.send_message(deal.chat_id, text, reply_markup=to_bot_kb(await get_start_link('')))
-    need_to_pay = deal.price - deal.payed if deal.payed < deal.price else 0
 
-    commission = await commission_db.get_commission(customer.commission_id)
-    commission = commission.calculate_commission(need_to_pay)
+    need_to_pay = deal.price - deal.payed
+    commission_package = await commission_db.get_commission(customer.commission_id)
+    commission = commission_package.deal_commission(deal)
+
     text = (
-        f'Ви бажаєте оплатити угоду для вашого поста "{post.title}".\n\n'
-        f'Встановлена ціна {deal.price} грн.\n'
-        f'Сплачено: {deal.payed} грн.\n'
-        f'Необхідно сплатити: {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
+        f'Ви бажаєте оплатити угоду "{post.title}".\n\n'
+        f'Встановлена ціна {deal.price} грн., з неї сплачено {deal.payed} грн.\n'
+        f'👉 Необхідно сплатити {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
     )
     if customer.balance > 0 and customer.balance >= need_to_pay + commission:
         text += (
-            f'На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
+            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
             f'Або оплатити всю суму угоди окремим платежем.\n\nБудь-ласка оберіть метод оплати.'
         )
         reply_markup = pay_deal_kb(deal, balance=True)
     elif 0 < customer.balance < need_to_pay + commission:
         text += (
-            f'На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
-            f'та оплатити решту у розмірі {need_to_pay - customer.balance} грн. '
-            f'Або оплатити всю суму угоди окремим платежем.\n\n'
+            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
+            f'та оплатити решту у розмірі {need_to_pay + commission - customer.balance} грн. '
+            f'Або ж оплатити всю суму угоди окремим платежем.\n\n'
             f'Будь-ласка оберіть метод оплати.'
         )
         reply_markup = pay_deal_kb(deal, partially=True)

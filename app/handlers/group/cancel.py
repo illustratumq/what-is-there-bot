@@ -100,12 +100,11 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         await bot.send_message(user_id, text)
 
     if deal.type == DealTypeEnum.PUBLIC:
-
-        new_post_photo = make_post_media_template(post.title, post.about, post.price)
-        photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
-        await post_db.update_post(post.post_id, media_url=photo_message.url)
-        os.remove(new_post_photo)
-
+        if deal.is_template_photo:
+            new_post_photo = make_post_media_template(post.title, post.about, post.price)
+            photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+            await post_db.update_post(post.post_id, media_url=photo_message.url)
+            os.remove(new_post_photo)
         if post.message_id:
             await bot.delete_message(config.misc.post_channel_chat_id, post.message_id)
             post_channel = await bot.send_message(
@@ -206,10 +205,11 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await call.bot.send_message(deal.customer_id, text, reply_markup=evaluate_deal_kb(deal))
         await post_db.update_post(post.post_id, status=DealStatusEnum.DONE)
         if deal.type == DealTypeEnum.PUBLIC:
-            new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
-            photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
-            await post_db.update_post(post.post_id, media_url=photo_message.url)
-            os.remove(new_post_photo)
+            if deal.is_template_photo:
+                new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
+                photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+                await post_db.update_post(post.post_id, media_url=photo_message.url)
+                os.remove(new_post_photo)
             await call.bot.edit_message_text(
                 post.construct_post_text(), config.misc.reserv_channel_id, post.reserv_message_id
             )

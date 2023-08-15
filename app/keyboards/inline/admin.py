@@ -3,6 +3,7 @@ from app.keyboards.inline.back import back_bt
 from app.keyboards.inline.base import *
 
 admin_room_cb = CallbackData('adr', 'deal_id', 'action')
+user_search_cb = CallbackData('usr', 'user_id', 'action')
 user_setting_cb = CallbackData('ust', 'deal_id', 'user_id', 'action')
 manage_post_cb = CallbackData('mg', 'post_id', 'action')
 
@@ -98,4 +99,16 @@ def confirm_moderate_post_kb(post: Post, action: str):
 
     return InlineKeyboardMarkup(
         row_width=1, inline_keyboard=inline_keyboard
+    )
+
+
+def user_info_kb(user_id: int):
+
+    def button_cb(action: str):
+        return dict(callback_data=user_search_cb.new(user_id=user_id, action=action))
+
+    return InlineKeyboardMarkup(
+        row_width=1, inline_keyboard=[
+            [InlineKeyboardButton(Buttons.admin.user_detail, **button_cb('info'))]
+        ]
     )

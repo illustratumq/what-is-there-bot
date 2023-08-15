@@ -37,6 +37,9 @@ class PostRepo(BaseRepo[Post]):
     async def get_posts_status(self, status: DealStatusEnum) -> list[Post]:
         return await self.get_all(self.model.status == status)
 
+    async def get_post_admin_channel(self, message_id: int) -> Post:
+        return await self.get_one(self.model.admin_message_id == message_id)
+
     async def update_post(self, post_id: int, **kwargs) -> None:
         return await self.update(self.model.post_id == post_id, **kwargs)
 
@@ -64,7 +67,10 @@ class DealRepo(BaseRepo[Deal]):
         return deals
 
     async def get_deal_customer(self, customer_id: int, status: DealStatusEnum) -> list[Deal]:
-        return await self.get_all(self.model.customer_id == customer_id, self.model.status == status)
+        if isinstance(status, DealStatusEnum):
+            return await self.get_all(self.model.customer_id == customer_id, self.model.status == status)
+        elif status == '*':
+            return await self.get_all(self.model.customer_id == customer_id)
 
     async def get_deal_post(self, post_id: int) -> Deal:
         return await self.get_one(self.model.post_id == post_id)
@@ -74,7 +80,10 @@ class DealRepo(BaseRepo[Deal]):
                                   self.model.status == DealStatusEnum.DONE)
 
     async def get_deal_executor(self, executor_id: int, status: DealStatusEnum) -> list[Deal]:
-        return await self.get_all(self.model.executor_id == executor_id, self.model.status == status)
+        if isinstance(status, DealStatusEnum):
+            return await self.get_all(self.model.executor_id == executor_id, self.model.status == status)
+        elif status == '*':
+            return await self.get_all(self.model.executor_id == executor_id)
 
     async def calculate_user_rating(self, user_id: int) -> tuple:
         deals = await self.get_all(self.model.executor_id == user_id, self.model.status == DealStatusEnum.DONE)

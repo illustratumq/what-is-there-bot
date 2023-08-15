@@ -2,8 +2,9 @@ import os
 from datetime import timedelta, datetime
 
 from aiogram import Dispatcher
+from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import CallbackQuery, ChatActions, ChatType, InputFile
+from aiogram.types import CallbackQuery, ChatActions, ChatType, InputFile, Message
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum
@@ -16,8 +17,8 @@ from app.misc.media import make_post_media_template
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
-                          post_db: PostRepo, room_db: RoomRepo, user_db: UserRepo, config: Config,
-                          userbot: UserbotController):
+                          post_db: PostRepo, room_db: RoomRepo, config: Config,
+                          userbot: UserbotController, state: FSMContext):
     await call.message.delete_reply_markup()
     deal_id = int(callback_data['deal_id'])
     executor_id = int(callback_data['executor_id'])
@@ -31,10 +32,11 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     await post_db.update_post(deal.post_id, status=DealStatusEnum.BUSY)
 
     post = await post_db.get_post(deal.post_id)
-    new_post_photo = make_post_media_template(post.title, post.about, post.price, version='proc')
-    photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
-    await post_db.update_post(post.post_id, media_url=photo_message.url)
-    os.remove(new_post_photo)
+    if deal.is_template_photo:
+        new_post_photo = make_post_media_template(post.title, post.about, post.price, version='proc')
+        photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
+        await post_db.update_post(post.post_id, media_url=photo_message.url)
+        os.remove(new_post_photo)
     if post.message_id:
         await call.bot.edit_message_text(
             chat_id=config.misc.post_channel_chat_id, message_id=post.message_id,
@@ -44,7 +46,7 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
         chat_id=config.misc.reserv_channel_id, message_id=post.reserv_message_id,
         text=post.construct_post_text()
     )
-    room_chat_id, invite_link = await get_room(call, room_db, userbot)
+    room_chat_id, invite_link = await get_room(call.message, call.from_user.id, room_db, userbot)
     await deal_db.update_deal(
         deal_id, chat_id=room_chat_id, executor_id=executor_id,
         next_activity_date=datetime.now() + timedelta(minutes=1)
@@ -53,11 +55,14 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
         f'Угода ухвалена. Заходьте до кімнати замовлення "{post.title}" за цим посиланням:\n\n'
         f'{invite_link}\n\nАбо натисніть на кнопку під цим повідомленням'
     )
-    await call.bot.send_message(
+    customer_msg = await call.bot.send_message(
         deal.customer_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
-    await call.bot.send_message(
+    executor_msg = await call.bot.send_message(
         executor_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
-
+    await state.storage.update_data(
+        chat=room_chat_id, user=deal.executor_id, last_msg_id=executor_msg.message_id)
+    await state.storage.update_data(
+        chat=room_chat_id, user=deal.customer_id, last_msg_id=customer_msg.message_id)
 
 async def refuse_admin_enter_chat(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, room_db: RoomRepo,
                                   config: Config):
@@ -80,20 +85,21 @@ def setup(dp: Dispatcher):
         state='*')
 
 
-async def get_room(call: CallbackQuery, room_db: RoomRepo, userbot: UserbotController) -> tuple[int, str]:
+async def get_room(msg: Message, user_id: int, room_db: RoomRepo, userbot: UserbotController) -> tuple[int, str]:
     room = await room_db.get_free_room()
-    await call.message.answer('Очікуйте, ми створюємо для вас кімнату...')
+    msg = await msg.answer('Очікуйте, ми створюємо для вас кімнату...')
     if room is None:
-        await call.bot.send_chat_action(call.from_user.id, ChatActions.FIND_LOCATION)
+        await msg.bot.send_chat_action(user_id, ChatActions.FIND_LOCATION)
         quantity_of_rooms = await room_db.count()
         chat, invite_link, name = await userbot.create_new_room(quantity_of_rooms)
         await room_db.add(chat_id=chat.id, invite_link=invite_link.invite_link, status=RoomStatusEnum.BUSY, name=name)
-        await set_new_room_commands(call.bot, chat.id, await userbot.get_client_user_id())
+        await set_new_room_commands(msg.bot, chat.id, await userbot.get_client_user_id())
         chat_id = chat.id
         invite_link = invite_link.invite_link
     else:
-        await call.bot.send_chat_action(call.from_user.id, ChatActions.FIND_LOCATION)
+        await msg.bot.send_chat_action(user_id, ChatActions.FIND_LOCATION)
         await room_db.update_room(room.chat_id, status=RoomStatusEnum.BUSY)
         chat_id = room.chat_id
         invite_link = room.invite_link
+    await msg.delete()
     return chat_id, invite_link

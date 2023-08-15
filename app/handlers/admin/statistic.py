@@ -183,10 +183,11 @@ async def admin_statistic_finance(axes: [Axes, Axes], deals: list[DealRepo.model
     axes[0].set_xticks(x_ticks_date_range[::step], x_ticks_date[::step], rotation=50)
     axes[0].set_ylim(0, max(price_sum) * 1.2)
     axes[0].set_ylabel('Фінанси', fontweight='bold')
-    axes[1].pie([sum(commission_sum), sum(price_sum)],
-                labels=(f'Комісія\n{sum(commission_sum)}, грн', f'Загальний оборот\n{sum(price_sum)}, грн'),
-                colors=['#2CEA75', '#2E79EA'], wedgeprops=dict(width=0.3, edgecolor='k'),
-                startangle=80)
+    if sum(commission_sum) > 0 and sum(price_sum) > 0:
+        axes[1].pie([sum(commission_sum), sum(price_sum)],
+                    labels=(f'Комісія\n{sum(commission_sum)}, грн', f'Загальний оборот\n{sum(price_sum)}, грн'),
+                    colors=['#2CEA75', '#2E79EA'], wedgeprops=dict(width=0.3, edgecolor='k'),
+                    startangle=80)
     return sum(commission_sum), sum(price_sum)
 
 def select_models_date(models: list[TimedBaseModel], dates: tuple[datetime, datetime], created: bool = True) -> list:

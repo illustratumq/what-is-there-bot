@@ -8,7 +8,7 @@ from app.database.services.enums import DealStatusEnum, DealTypeEnum
 from app.database.services.repos import DealRepo, PostRepo
 from app.keyboards import Buttons
 from app.keyboards.inline.deal import to_bot_kb
-from app.keyboards.reply.menu import basic_kb
+from app.keyboards.reply.menu import basic_kb, menu_kb
 from app.states.states import PrivateDealSG
 
 
@@ -53,7 +53,7 @@ async def save_deal_role(msg: Message, deal_db: DealRepo, post_db: PostRepo, sta
     )
     await deal_db.update_deal(deal.deal_id, post_id=post.post_id)
     await msg.answer('🎉 Нова приватна угода створена!\n\nПерешли наступне '
-                     'повідомлення іншому учаснику, для того щоб розпочати', reply_markup=basic_kb([Buttons.menu.back]))
+                     'повідомлення іншому учаснику, для того щоб розпочати', reply_markup=menu_kb())
     await new_deal_invite_msg(msg, deal, state)
     await state.finish()
 

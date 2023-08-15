@@ -40,6 +40,14 @@ class DealTypeEnum(Enum):
 
 class OrderStatusEnum(Enum):
     CREATED = 'CREATED'
-    PREPARING = 'PREPARING'
-    SUCCESSFUL = 'SUCCESSFUL'
-    FAILURE = 'FAILURE'
+    PROCESSING = 'PROCESSING'
+    DECLINED = 'DECLINED'
+    APPROVED = 'APPROVED'
+    EXPIRED = 'EXPIRED'
+    REVERSED = 'REVERSE'
+
+
+class OrderTypeEnum(Enum):
+    ORDER = 'ORDER'
+    CAPTURE = 'CAPTURE'
+    SETTLEMENT = 'SETTLEMENT'

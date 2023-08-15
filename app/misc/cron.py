@@ -107,14 +107,25 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
 
 async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrapper):
     db = database(session)
-    for order in await db.order_db.get_orders_status(OrderStatusEnum.PREPARING):
-        response = (await fondy.check_order(order.order_id))['response']
+    for order in await db.order_db.get_orders_status(OrderStatusEnum.PROCESSING):
+        response = (await fondy.check_order(order))['response']
+        deal = await db.deal_db.get_deal(order.deal_id)
+        await bot.send_message(deal.chat_id, response)
         if response['order_status'] == 'approved':
+            # deal = await db.deal_db.get_deal(order.deal_id)
+            # answer = await fondy.make_capture(order, deal.price)
+            # await bot.send_message(deal.chat_id, answer)
             deal = await db.deal_db.get_deal(int(response['merchant_data']))
             executor = await db.user_db.get_user(deal.executor_id)
+            customer = await db.user_db.get_user(deal.customer_id)
             need_to_pay = int(int(response['actual_amount']) / 100)
+            if 'pay_from_balance' in order.body.keys():
+                need_to_pay += int(order.body['pay_from_balance'])
+            commission_package = await db.commission_db.get_commission(customer.commission_id)
+            commission = commission_package.deal_commission(deal)
             post = await db.post_db.get_post(deal.post_id)
-            await db.deal_db.update_deal(deal.deal_id, payed=need_to_pay)
+            await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + need_to_pay - commission,
+                                         commission=deal.commission + commission)
             text_to_chat = (
                 f'🔔 Угода була успішно сплачена, кошти зберігаються на балансі сервісу. '
                 f'{executor.create_html_link("Виконавець")} можете приступати до роботи!'
@@ -123,12 +134,12 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
                 f'🔔 Замовник оплатив угоду "{post.title}", можете приступати до виконання завдання.'
             )
             text_to_customer = (
-                f'✅ Угода успішно оплачена. З вашого рахунку списано {need_to_pay} грн.'
+                f'✅ Угода успішно оплачена'
             )
             await bot.send_message(deal.customer_id, text_to_customer)
             await bot.send_message(deal.executor_id, text_to_executor)
             await bot.send_message(deal.chat_id, text_to_chat)
-            await db.order_db.update_order(order.id, status=OrderStatusEnum.SUCCESSFUL)
+            await db.order_db.update_order(order.id, status=OrderStatusEnum.APPROVED)
 
 
 async def send_database(session: sessionmaker, bot: Bot, config: Config):

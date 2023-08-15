@@ -5,8 +5,7 @@ def admin_kb():
 
     keyboard = [
         [KeyboardButton(Buttons.admin.statistic), KeyboardButton(Buttons.admin.commission)],
-        [KeyboardButton(Buttons.admin.user), KeyboardButton(Buttons.admin.setting)],
-        [KeyboardButton(Buttons.admin.menu)]
+        [KeyboardButton(Buttons.admin.user), KeyboardButton(Buttons.admin.menu)]
     ]
 
     return ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, keyboard=keyboard)

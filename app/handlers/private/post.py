@@ -113,7 +113,7 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
         await state.update_data(template_media_file=media_file)
     data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot, is_template_photo)
     post_msg = await msg.answer(construct_post_text(data))
-    await state.update_data(post_message_id=post_msg.message_id)
+    await state.update_data(post_message_id=post_msg.message_id, is_template_photo=is_template_photo)
     await msg.answer(
         f'<b>Пост готовий!</b>\n\n'
         f'Щоб змінити вміст посту, просто відредагуйте повідомлення, з яких він був зібраний (окрім матеріалів).\n\n'
@@ -164,7 +164,8 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
 
     post = await post_db.add(title=data['title'], about=data['about'], price=data['price'], media_id=data['media_id'],
                              media_url=data['media_url'], user_id=msg.from_user.id,)
-    deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price)
+    deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
+                             is_template_photo=data['is_template_photo'])
 
     if setting.need_check_post or await need_check_post_filter(user, post, deal_db):
         message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),

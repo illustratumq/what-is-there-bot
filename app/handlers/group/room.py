@@ -17,7 +17,8 @@ from app.misc.commands import set_new_room_commands
 
 
 async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, user_db: UserRepo,
-                                    post_db: PostRepo, userbot: UserbotController, config: Config):
+                                    post_db: PostRepo, userbot: UserbotController, config: Config,
+                                    state: FSMContext):
     deal = await deal_db.get_deal_chat(cjr.chat.id)
     if not deal or cjr.from_user.id not in deal.participants:
         await cjr.bot.send_message(cjr.from_user.id, 'Ви не є учасником цього завдання')
@@ -25,6 +26,9 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
         return
     await cjr.approve()
     members = await userbot.get_chat_members(cjr.chat.id)
+    data = await state.get_data()
+    if 'last_msg_id' in data.keys():
+        await cjr.bot.delete_message(cjr.from_user.id, data['last_msg_id'])
     if deal.customer_id in members and deal.executor_id in members:
         await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=1))
         await full_room_action(cjr, deal, user_db, post_db, config)
@@ -102,7 +106,6 @@ async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
 
 async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo,
                             state: FSMContext):
-    # await call.message.delete()
     deal = await deal_db.get_deal_chat(call.message.chat.id)
     post = await post_db.get_post(deal.post_id)
     await state.storage.reset_data(chat=call.message.chat.id, user=deal.customer_id)
