@@ -20,7 +20,6 @@ async def my_chats_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, room_
 
     for deal in deals_customer:
         if deal.status == DealStatusEnum.BUSY and deal.chat_id:
-            post = await post_db.get_post(deal.post_id)
             room = await room_db.get_room(deal.chat_id)
             text += (
                 f'{counter}. 🔗 <a href="{room.invite_link}">{room.name}</a> (Ви замовник)\n'
@@ -29,9 +28,10 @@ async def my_chats_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, room_
 
     for deal in deals_executor:
         if deal.status == DealStatusEnum.BUSY and deal.chat_id:
-            post = await post_db.get_post(deal.post_id)
             room = await room_db.get_room(deal.chat_id)
-            text += f'{counter}. 🔗 {room.invite_link} "{post.title}" (Ви виконавець)\n'
+            text += (
+                f'{counter}. 🔗 <a href="{room.invite_link}">{room.name}</a> (Ви виконавець)\n'
+            )
             counter += 1
 
     await msg.answer(text=text, disable_web_page_preview=True, reply_markup=basic_kb([Buttons.menu.back]))

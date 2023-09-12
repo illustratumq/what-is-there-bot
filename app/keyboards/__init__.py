@@ -108,12 +108,26 @@ class AdminPost:
     main: str = '◀ Назад'
     back: str = 'Закрити'
 
+class Date:
+    week: str = 'Цей тиждень'
+    month: str = 'Цей місяць'
+    day: str = 'Сьогодні'
+    select_date: str = 'Власна дата'
+
+class Statistic:
+    date_menu = Date()
+    deals: str = 'Угоди 🤝'
+    posts: str = 'Пости 📬'
+    finance: str = 'Фінанси 💸'
+    users: str = 'Користувачі 👤'
+    update: str = 'Оновити 🔄'
+    date: str = 'Період 🗓'
 
 class Admin:
+    statistic = 'Статистика 📊'
+    statistic_menu = Statistic()
     post = AdminPost()
     commission_edit = Commission()
-    statistic: str = '📊 Статистика'
-    dates: str = 'Ввести період статистики'
     commission: str = '💵 Комісія'
     setting: str = '⚙ Налаштування'
     user: str = '🗂 Юзери'

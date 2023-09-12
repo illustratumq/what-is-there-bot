@@ -36,6 +36,7 @@ class ThrottlingMiddleware(BaseMiddleware):
     async def target_throttled(target: Union[Message, CallbackQuery],
                                throttled: Throttled, dispatcher: Dispatcher, key: str):
         msg = target.message if isinstance(target, CallbackQuery) else target
+        call = target if isinstance(target, CallbackQuery) else None
         delta = throttled.rate - throttled.delta
         if throttled.exceeded_count == 2:
             await msg.reply('Занадто часто! Давай не так швидко')
@@ -48,6 +49,9 @@ class ThrottlingMiddleware(BaseMiddleware):
         thr = await dispatcher.check_key(key)
         if thr.exceeded_count == throttled.exceeded_count:
             await msg.reply('Усе, тепер відповідаю')
+
+        if call:
+            await call.answer()
 
     async def on_process_message(self, message: Message, data: dict):
         await self.throttle(message, data)

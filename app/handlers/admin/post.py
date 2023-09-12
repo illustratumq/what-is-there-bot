@@ -141,7 +141,8 @@ async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: Po
         f'{post.construct_post_text(use_bot_link=False)}'
     )
     await deal_db.delete_deal(post.deal_id)
-    await post_db.delete_post(post.post_id)
+    await post_db.update_post(post.post_id, status=DealStatusEnum.DISABLES)
+    # await post_db.delete_post(post.post_id)
     await call.message.edit_text(admin_channel_text, disable_web_page_preview=False if post.media_url else True)
     await call.bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" було відхилено адміністрацією')
 

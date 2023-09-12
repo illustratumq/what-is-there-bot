@@ -34,7 +34,7 @@ async def send_deal_cmd(call: CallbackQuery, state: FSMContext, deal_db: DealRep
     if call.from_user.id not in willing_ids:
         willing_ids.append(call.from_user.id)
         await deal_db.update_deal(data['deal_id'], willing_ids=willing_ids)
-    comment = f'Коментар:\n\n{comment}' if comment else ''
+    comment = f'\n\nКоментар:\n{comment}' if comment else ''
     text_to_customer = (
         f'{await user.construct_preview_text(deal_db)}'
         f'{comment} {hide_link(post.post_url)}\n'

@@ -18,7 +18,7 @@ from app.keyboards.reply.menu import basic_kb
 from app.misc.times import localize, now
 
 
-async def admin_statistic_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo, state: FSMContext):
+async def admin_statistic_cmd_old(msg: Message, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo, state: FSMContext):
     msg = await msg.answer('Збираю статистику...')
     deals = await deal_db.get_deal_status(DealStatusEnum.DONE)
     users = await user_db.get_all()
@@ -79,13 +79,13 @@ async def save_statistic_states(msg: Message, deal_db: DealRepo, post_db: PostRe
             now().strptime(dates.split('-')[1].strip(), '%d.%m.%y')
         )
         await state.update_data(dates=msg.text)
-        await admin_statistic_cmd(msg, deal_db, post_db, user_db, state)
+        # await admin_statistic_cmd(msg, deal_db, post_db, user_db, state)
     except:
         await msg.answer('Щось пішло не так, спробуйте ще раз')
 
 
 def setup(dp: Dispatcher):
-    dp.register_message_handler(admin_statistic_cmd, text=Buttons.admin.statistic, state='*')
+    # dp.register_message_handler(admin_statistic_cmd, text=Buttons.admin.statistic, state='*')
     dp.register_message_handler(input_statistic_dates, text=Buttons.admin.dates, state='*')
     dp.register_message_handler(save_statistic_states, state='dates')
 

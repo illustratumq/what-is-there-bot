@@ -130,18 +130,18 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
 
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
     room = await room_db.get_room(deal.chat_id)
-    for user_id in deal.participants:
+    for user_id in await userbot.get_chat_members(room.chat_id):
         try:
-            if user_id != await userbot.get_client_user_id():
+            if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
                 await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
         except Exception as error:
             log.error(str(error) + f'\n{deal.deal_id=}')
-    if room.admin_id:
-        try:
-            if room.admin_id != await userbot.get_client_user_id():
-                await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
-        except Exception as error:
-            log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
+    # if room.admin_id:
+    #     try:
+    #         if room.admin_id != await userbot.get_client_user_id():
+    #             await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
+    #     except Exception as error:
+    #         log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
 
     if deal.type == DealTypeEnum.PRIVATE:
         if deal.customer_id == post.user_id:
@@ -221,17 +221,17 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
 
         await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
-        for user_id in deal.participants:
+        for user_id in await userbot.get_chat_members(room.chat_id):
             try:
-                if user_id != await userbot.get_client_user_id():
+                if user_id not in (await userbot.get_client_user_id(), (await call.bot.me).id):
                     await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
             except Exception as error:
                 log.error(str(error) + f'\n{deal.deal_id=}')
-        if room.admin_id:
-            try:
-                await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
-            except Exception as error:
-                log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
+        # if room.admin_id:
+        #     try:
+        #         await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
+        #     except Exception as error:
+        #         log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
 
         if deal.type == DealTypeEnum.PRIVATE:
             if deal.customer_id == post.user_id:

@@ -30,7 +30,7 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     if 'last_msg_id' in data.keys():
         await cjr.bot.delete_message(cjr.from_user.id, data['last_msg_id'])
     if deal.customer_id in members and deal.executor_id in members:
-        await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=1))
+        await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(hours=12))
         await full_room_action(cjr, deal, user_db, post_db, config)
     else:
         await cjr.bot.send_message(
@@ -139,7 +139,7 @@ async def confirm_room_activity(call: CallbackQuery, callback_data: dict, deal_d
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     await deal_db.update_deal(deal.deal_id, activity_confirm=True,
-                              next_activity_date=datetime.now() + timedelta(minutes=1))
+                              next_activity_date=datetime.now() + timedelta(hours=12))
     user = await user_db.get_user(call.from_user.id)
     text = (
         f'✅ {user.create_html_link("Замовник" if user.user_id == deal.customer_id else "Виконавець")} підтвердив '

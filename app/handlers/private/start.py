@@ -42,6 +42,7 @@ greeting_text = (
 
 async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo):
     bot = (await msg.bot.me).username
+
     if not msg.from_user.is_bot:
         user = await user_db.get_user(msg.from_user.id)
         text = greeting_text.format(bot) if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню'
@@ -55,9 +56,10 @@ async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
     user = await user_db.get_user(msg.from_user.id)
     await msg.answer('Ви відмінили дію', reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN))
 
-async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, post_db: PostRepo,
+async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo, post_db: PostRepo,
                           state: FSMContext):
     await msg.delete()
+    user = await user_db.get_user(msg.from_user.id)
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     if not deal:
@@ -70,9 +72,12 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
     elif deal.customer_id == msg.from_user.id:
         await msg.answer('Ви не можете долучитися до свого завдання')
         return
-    elif msg.from_user.id in deal.willing_ids:
-        await msg.answer('Ви вже відправили запит на це завдання')
-        return
+    # elif user.type == UserTypeEnum.ADMIN:
+    #     await msg.answer('Ви не можете долучатись до завдань, будучи адміністратором')
+    #     return
+    # elif msg.from_user.id in deal.willing_ids:
+    #     await msg.answer('Ви вже відправили запит на це завдання')
+    #     return
     text = (
         f'Ви хочете стати виконавцем завдання.\n\n'
         f'Для цього, надішліть коментар, який побачить замовник у Вашому запиті, і натисніть кнопку '
