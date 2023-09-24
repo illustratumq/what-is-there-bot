@@ -69,9 +69,9 @@ def setup_cron_function(scheduler: ContextSchedulerDecorator):
     #scheduler.add_job(
     #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     #)
-    # scheduler.add_job(
-    #     func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
-    # )
+    scheduler.add_job(
+        func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
+    )
     #scheduler.add_job(
     #    func=checking_chat_activity_func, trigger='interval', seconds=1800, name='Перевірка активності чатів'
     #)

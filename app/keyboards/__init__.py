@@ -2,6 +2,7 @@
 
 class Menu:
     to_markers: str = '◀ До сповіщень'
+    letter: str = 'Повідомлення ✉️'
     to_rating: str = '◀ До рейтингу'
     markers: str = 'Підписки 📚'
     work_times: str = 'Час роботи ⏱'
@@ -19,6 +20,10 @@ class Menu:
     comment: str = 'Відгуки про мене 💭'
     admin: str = '🔁 В адмін-панель'
     back: str = '◀ Назад'
+
+    @staticmethod
+    def new_letter(n):
+        return f'Повідомлення 📩 ({n})'
 
 
 class Action:
@@ -61,9 +66,10 @@ class Post:
     contract: str = 'Договірна'
     publish: str = 'Опубліковати 📬'
     cancel: str = 'Скасувати'
+    understand = 'Зрозуміло 👌'
     confirm: str = 'Підтвержую ✔'
     participate: str = 'Долучитися'
-    send_deal: str = 'Надіслати запит ✉'
+    send_deal: str = 'Надіслати запит 📤'
     manage_post: str = 'Керувати постом 📝'
     publish_all: str = 'Опублікувати всі'
     back: str = 'Назад'

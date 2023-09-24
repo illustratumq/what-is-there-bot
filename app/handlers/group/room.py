@@ -46,6 +46,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     admin = await user_db.get_user(admin_id)
     reply_markup = add_admin_chat_kb(deal, admin)
     try:
+        print(deal.chat_id, admin_id)
         await userbot.add_chat_member(deal.chat_id, admin_id)
     except UserAlreadyParticipant:
         room = await room_db.get_room(deal.chat_id)
@@ -67,7 +68,7 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         '<b>Ви стали учасниками угоди. Можете приступати до обговорення.</b>\n\n'
         f'Замовник: {customer.mention}\n'
         f'Виконавець: {executor.mention}\n'
-        f'Ціна угоди: {deal.construct_price()}\n'
+        f'Ціна угоди: {deal.deal_price}\n'
         f'🆔 #Угода_номер_{deal.deal_id}\n'
         f'ℹ Якщо Ви не знаєте правил нашого сервісу, то радимо ознайомитись '
         f'з ними тут (посилання).\n\n'  # TODO: додати посилання на правила сервісу
@@ -81,8 +82,8 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
         f'<b>Виконавець</b>: {executor.mention}\n\n'
-        f'<b>Встановленна ціна:</b> {deal.construct_price()}\n'
-        f'<b>Статус угоди</b>: {deal.chat_status()}\n'
+        f'<b>Встановленна ціна:</b> {deal.deal_priced}\n'
+        f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     await message.answer(f'{text}\nДля повторного виклику натисніть /menu',
                          reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
@@ -98,8 +99,8 @@ async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
         f'<b>Виконавець</b>: {executor.mention}\n\n'
-        f'<b>Встановленна ціна:</b> {deal.construct_price()}\n'
-        f'<b>Статус угоди</b>: {deal.chat_status()}\n'
+        f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
+        f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     await msg.answer(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
 
@@ -116,8 +117,8 @@ async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: Pos
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
         f'<b>Виконавець</b>: {executor.mention}\n\n'
-        f'<b>Встановленна ціна:</b> {deal.construct_price()}\n'
-        f'<b>Статус угоди</b>: {deal.chat_status()}\n'
+        f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
+        f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     await call.message.edit_text(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
 

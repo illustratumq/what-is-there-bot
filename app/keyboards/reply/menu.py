@@ -1,16 +1,17 @@
 from app.keyboards.reply.base import *
 
 
-def menu_kb(admin: bool = False):
+def menu_kb(admin: bool = False, letters: int = 0):
     keyboard = [
         [KeyboardButton(Buttons.menu.new_post), KeyboardButton(Buttons.menu.new_deal)],
         [KeyboardButton(Buttons.menu.my_posts), KeyboardButton(Buttons.menu.my_money)],
         [KeyboardButton(Buttons.menu.my_rating), KeyboardButton(Buttons.menu.my_chats)],
-        [KeyboardButton(Buttons.menu.notifications)]
+        [KeyboardButton(Buttons.menu.letter if letters == 0 else Buttons.menu.new_letter(letters)),
+         KeyboardButton(Buttons.menu.notifications)]
     ]
 
     if admin:
-        keyboard[-1].append(KeyboardButton(Buttons.menu.admin))
+        keyboard.append([KeyboardButton(Buttons.menu.admin)])
 
     return ReplyKeyboardMarkup(
         row_width=2,

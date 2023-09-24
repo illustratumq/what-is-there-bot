@@ -40,7 +40,11 @@ async def statistic_date_choose(call: CallbackQuery, callback_data: dict, state:
     )
     await call.message.edit_text(text, reply_markup=statistic_date_kb(callback_data['back'], callback_data['date']))
 
-# async def statistic_input_date(msg: Message):
+# async def statistic_input_date(msg: Message, state: FSMContext):
+#     date = check_date(msg.text)
+#     if date:
+#         if isinstance(date, tuple):
+#             start, end =
 
 async def posts_statistic(call: CallbackQuery, callback_data: dict, post_db: PostRepo):
     date = callback_data['date']
@@ -85,3 +89,19 @@ def setup(dp: Dispatcher):
     dp.register_message_handler(admin_statistic_cmd, text=Buttons.admin.statistic, state='*')
     dp.register_callback_query_handler(statistic_date_choose, statistic_cb.filter(action='date'), state='*')
     dp.register_callback_query_handler(posts_statistic, statistic_cb.filter(action='posts'), state='*')
+
+
+def check_date(string: str):
+    dtf = '%d.%m.%y'
+    try:
+        if '-' in string:
+            start = string.split('-')[0].strip()
+            end = string.split('-')[-1].strip()
+            start = now().strptime(dtf, start)
+            end = now().strptime(dtf, end)
+            return f'{start.strftime(dtf)}-{end.strftime(dtf)}'
+        else:
+            date = now().strptime(dtf, string.strip())
+            return date
+    except:
+        return False

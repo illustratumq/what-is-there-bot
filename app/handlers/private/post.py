@@ -12,7 +12,8 @@ from apscheduler_di import ContextSchedulerDecorator
 
 from app.config import Config
 from app.database.services.enums import PostStatusText, DealStatusEnum
-from app.database.services.repos import PostRepo, DealRepo, CommissionRepo, UserRepo, SettingRepo, MarkerRepo
+from app.database.services.repos import PostRepo, DealRepo, CommissionRepo, UserRepo, SettingRepo, MarkerRepo, \
+    LetterRepo
 from app.handlers.admin.post import publish_post_base_channel
 from app.keyboards import Buttons
 from app.keyboards.inline.moderate import moderate_post_kb
@@ -104,16 +105,16 @@ async def add_media_to_post(msg: Message, state: FSMContext):
 
 async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config):
     data = await state.get_data()
-    is_template_photo = False
+    no_media = False
     if not data['media']:
-        is_template_photo = True
+        no_media = True
         media_file = make_post_media_template(data['title'], data['about'], data['price'])
         data['media'] = [media_file]
         data['media_type'] = ContentType.PHOTO
         await state.update_data(template_media_file=media_file)
-    data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot, is_template_photo)
+    data = await publish_channel_media(state, data, config.misc.media_channel_chat_id, msg.bot, no_media)
     post_msg = await msg.answer(construct_post_text(data))
-    await state.update_data(post_message_id=post_msg.message_id, is_template_photo=is_template_photo)
+    await state.update_data(post_message_id=post_msg.message_id, no_media=no_media)
     await msg.answer(
         f'<b>Пост готовий!</b>\n\n'
         f'Щоб змінити вміст посту, просто відредагуйте повідомлення, з яких він був зібраний (окрім матеріалів).\n\n'
@@ -153,22 +154,19 @@ async def edit_new_post_data(msg: Message, state: FSMContext, user_db: UserRepo,
 
 async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, deal_db: DealRepo,
                            setting_db: SettingRepo, user_db: UserRepo, config: Config,
-                           scheduler: ContextSchedulerDecorator, marker_db: MarkerRepo):
+                           scheduler: ContextSchedulerDecorator, marker_db: MarkerRepo, letter_db: LetterRepo):
     data = await state.get_data()
     setting = await setting_db.get_setting(msg.from_user.id)
     user = await user_db.get_user(msg.from_user.id)
 
-    if not setting.can_publish_post:
-        await msg.answer('Адміністрація сервісу заборонила вам публікувати пости')
-        return
-
     post = await post_db.add(title=data['title'], about=data['about'], price=data['price'], media_id=data['media_id'],
                              media_url=data['media_url'], user_id=msg.from_user.id,)
     deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
-                             is_template_photo=data['is_template_photo'])
+                             no_media=data['no_media'])
 
     if setting.need_check_post or await need_check_post_filter(user, post, deal_db):
-        message = await msg.bot.send_message(config.misc.admin_channel_id, post.construct_post_text(use_bot_link=False),
+        message = await msg.bot.send_message(config.misc.admin_channel_id,
+                                             post.construct_post_text(use_bot_link=False),
                                              reply_markup=moderate_post_kb(post))
         await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
         await msg.answer('Ваш пост відправлений на модерацію 👌', reply_markup=menu_kb())
@@ -183,7 +181,8 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
         await deal_db.update_deal(post.deal_id, status=DealStatusEnum.ACTIVE)
         scheduler.add_job(
             publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
-            kwargs=dict(post=post, bot=msg.bot, post_db=post_db, marker_db=marker_db, user_db=user_db),
+            kwargs=dict(post=post, bot=msg.bot, post_db=post_db, marker_db=marker_db, user_db=user_db,
+                        letter_db=letter_db),
             name=f'Публікація поста #{post.post_id} на основному каналі'
         )
         await msg.answer('Ваш пост скоро опублікується 👌', reply_markup=menu_kb())

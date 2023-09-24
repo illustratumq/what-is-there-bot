@@ -25,6 +25,8 @@ class DatabaseMiddleware(LifetimeControllerMiddleware):
         data['commission_db'] = CommissionRepo(session)
         data['order_db'] = OrderRepo(session)
         data['marker_db'] = MarkerRepo(session)
+        data['letter_db'] = LetterRepo(session)
+        data['join_db'] = JoinRepo(session)
         data['session_pool'] = self.session_pool
         data['session'] = session
 

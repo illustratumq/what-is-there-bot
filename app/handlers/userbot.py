@@ -22,33 +22,34 @@ class UserbotController:
         self._bot_username = bot_username
         self._chat_photo_path = chat_photo_path
 
-    async def get_client_user_id(self) -> int:
-        async with self._client:
-            return (await self._client.get_me()).id
+    async def connect(self):
+        try:
+            await self._client.start()
+        except:
+            pass
 
-    async def clean_chat_history(self, chat_id: int):
-        async with self._client as client:
-            history = client.get_chat_history(chat_id=chat_id)
-            message_ids = []
-            async for msg in history:
-                message_ids.append(msg.id)
-            await client.delete_messages(chat_id=chat_id, message_ids=message_ids)
+    async def get_client_user_id(self) -> int:
+        await self.connect()
+        user_id = (await self._client.get_me()).id
+        return user_id
 
     async def get_chat_members(self, chat_id: int) -> list:
         members = []
-        async with self._client as client:
-            async for member in client.get_chat_members(chat_id):
-                member: ChatMember
-                members.append(member.user.id)
+        await self.connect()
+        client = self._client
+        async for member in client.get_chat_members(chat_id):
+            member: ChatMember
+            members.append(member.user.id)
         return members
 
     async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink, str]:
-        async with self._client as client:
-            chat, room_name = await self._create_group(client, last_room_number)
-            await self._set_chat_photo(chat, last_room_number)
-            await self._set_chat_permissions(client, chat)
-            await self._set_bot_admin(client, chat)
-            invite_link = await self._create_invite_link(client, chat)
+        await self.connect()
+        client = self._client
+        chat, room_name = await self._create_group(client, last_room_number)
+        await self._set_chat_photo(chat, last_room_number)
+        await self._set_chat_permissions(client, chat)
+        await self._set_bot_admin(client, chat)
+        invite_link = await self._create_invite_link(client, chat)
         return chat, invite_link, room_name
 
     async def _create_group(self, client: Client, last_room_number: int) -> tuple[Chat, str]:
@@ -65,14 +66,6 @@ class UserbotController:
             can_invite_users=False, can_pin_messages=True,
         )
         await client.set_chat_permissions(chat.id, permissions)
-
-    @staticmethod
-    async def _set_chat_admin_rights(client: Client, chat: Chat):
-        rights = ChatAdminRights(
-            change_info=False, post_messages=True, edit_messages=True,
-            delete_messages=True, ban_users=True, invite_users=True, pin_messages=True,
-            add_admins=True, anonymous=True
-        )
 
     @staticmethod
     async def _set_chat_photo(chat: Chat, last_room_number: int) -> None:
@@ -97,14 +90,15 @@ class UserbotController:
             await self._invoke(client, raw)
 
     async def add_chat_member(self, chat_id: int, user_id: int):
-        async with self._client as client:
-            client: Client
-            await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
+        await self.connect()
+        await self._client.add_chat_members(chat_id=chat_id, user_ids=user_id)
+        # async with self._client as client:
+        #     client: Client
+        #     await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
 
     async def kick_chat_member(self, chat_id: int, user_id: int):
-        async with self._client as client:
-            client: Client
-            await client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=now() + timedelta(seconds=5))
+        await self.connect()
+        await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=now() + timedelta(seconds=5))
 
     async def _delete_group(self, client: Client, chat: Chat) -> None:
         raw = DeleteChat(chat_id=chat.id)

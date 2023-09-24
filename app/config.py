@@ -37,8 +37,6 @@ class TgBot:
     token: str
     admin_ids: tuple[int]
     moder_ids: tuple[int]
-    bot_link: str
-    payment_token: str
     fondy_credit_key: str
     fondy_merchant_id: str
 
@@ -60,7 +58,6 @@ class Miscellaneous:
     admin_channel_id: int
     reserv_channel_id: int
     database_channel_id: int
-    update_commands: bool
     timezone: str
 
 
@@ -82,10 +79,8 @@ class Config:
                 token=env.str('BOT_TOKEN'),
                 admin_ids=tuple(map(int, env.list('ADMIN_IDS'))),
                 moder_ids=tuple(map(int, env.list('MODER_IDS'))),
-                payment_token=env.str('PAYMENT_TOKEN'),
                 fondy_credit_key=env.str('FONDY_CREDIT_KEY'),
                 fondy_merchant_id=env.str('FONDY_MERCHANT_ID'),
-                bot_link=env.str('BOT_LINK')
             ),
             db=DbConfig(
                 host=env.str('DB_HOST', 'localhost'),
@@ -103,7 +98,6 @@ class Config:
                 log_level=env.log_level('LOG_LEVEL', logging.INFO),
                 media_channel_chat_id=env.int('MEDIA_CHANNEL_CHAT_ID'),
                 post_channel_chat_id=env.int('POST_CHANNEL_CHAT_ID'),
-                update_commands=env.bool('UPDATE_COMMANDS', True),
                 admin_channel_id=env.int('ADMIN_CHANNEL_ID'),
                 admin_help_channel_id=env.int('ADMIN_HELP_CHANNEL_ID'),
                 reserv_channel_id=env.int('RESERV_CHANNEL_ID'),

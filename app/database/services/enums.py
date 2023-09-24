@@ -13,7 +13,7 @@ class UserTypeEnum(Enum):
 
 class PostStatusText:
     ACTIVE = '⚪ Активно'
-    BUSY = '🟠 Виконується'
+    BUSY = '🟡 Виконується'
     DONE = '✅ Виконано'
     MODERATE = '📌 Очікує модерації'
     WAIT = '🕓 Очікує публікації'
@@ -51,3 +51,10 @@ class OrderTypeEnum(Enum):
     ORDER = 'ORDER'
     CAPTURE = 'CAPTURE'
     SETTLEMENT = 'SETTLEMENT'
+
+class JoinStatusEnum(Enum):
+    EDIT = 'EDIT'
+    ACTIVE = 'ACTIVE'
+    DISABLE = 'DISABLE'
+
+

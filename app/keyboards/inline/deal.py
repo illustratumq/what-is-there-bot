@@ -1,31 +1,36 @@
 from aiogram.utils.deep_linking import get_start_link
 
-from app.database.models import Deal, User
+from app.database.models import Deal, User, Join
 from app.keyboards.inline.base import *
 
-deal_cb = CallbackData('dl', 'deal_id', 'executor_id', 'action')
+deal_cb = CallbackData('dl', 'join_id', 'action')
 add_chat_cb = CallbackData('ad_cht', 'admin_id', 'deal_id', 'action')
 comment_cb = CallbackData('cm', 'original_id', 'deal_id', 'executor_id', 'action', 'sort')
 
 
-def send_deal_kb(deal: Deal, executor_id: int):
+def send_deal_kb(join: Join, delete: bool = False, ban: bool = False):
 
     def button_cb(action: str):
-        return dict(callback_data=deal_cb.new(deal_id=deal.deal_id, executor_id=executor_id, action=action))
+        return dict(callback_data=deal_cb.new(join_id=join.join_id, action=action))
 
-    return InlineKeyboardMarkup(
-        row_width=1,
-        inline_keyboard=[
-            [InlineKeyboardButton(Buttons.post.send_deal, **button_cb('send')),
-             InlineKeyboardButton(Buttons.post.cancel, **button_cb('close'))]
-        ]
-    )
+    inline_keyboard = [
+        [InlineKeyboardButton(Buttons.post.send_deal, **button_cb('send')),
+         InlineKeyboardButton(Buttons.post.cancel, **button_cb('close'))]
+    ]
+
+    if ban:
+        del inline_keyboard[0][0]
+
+    if delete:
+        inline_keyboard = [[InlineKeyboardButton(Buttons.post.understand, **button_cb('close'))]]
+
+    return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)
 
 
-def moderate_deal_kb(deal: Deal, executor_id: int, is_comment_deals: list):
+def moderate_deal_kb(join: Join, is_comment_deals: list):
 
     def button_cb(action: str):
-        return dict(callback_data=deal_cb.new(deal_id=deal.deal_id, executor_id=executor_id, action=action))
+        return dict(callback_data=deal_cb.new(join_id=join.join_id, action=action))
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.deal.chat, **button_cb('chat')),
@@ -36,8 +41,8 @@ def moderate_deal_kb(deal: Deal, executor_id: int, is_comment_deals: list):
 
         def button_c_cb(action: str):
             return dict(
-                callback_data=comment_cb.new(original_id=deal.deal_id, executor_id=executor_id, action=action,
-                                             deal_id=deal.deal_id, sort='None'))
+                callback_data=comment_cb.new(original_id=join.deal_id, executor_id=join.executor_id, action=action,
+                                             deal_id=join.deal_id, sort='None'))
 
         inline_keyboard.insert(0, [
             InlineKeyboardButton(Buttons.deal.read_comments, **button_c_cb('start'))

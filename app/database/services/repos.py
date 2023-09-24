@@ -214,3 +214,44 @@ class OrderRepo(BaseRepo[Order]):
 
     async def delete_order(self, order_id: int):
         return await self.delete(self.model.id == order_id)
+
+
+class LetterRepo(BaseRepo[Letter]):
+    model = Letter
+
+    async def get_letter(self, letter_id: int) -> Letter:
+        return await self.get_one(self.model.letter_id == letter_id)
+
+    async def get_new_letters_user(self, user_id: int) -> list[Letter]:
+        return await self.get_all(self.model.user_id == user_id, self.model.read == False)
+
+    async def get_all_user_letters(self, user_id: int) -> list[Letter]:
+        letters_new = await self.get_new_letters_user(user_id)
+        letters_old = await self.get_all(self.model.user_id == user_id, self.model.read == True)
+        letters_new.sort(key=lambda l: l.created_at)
+        letters_old.sort(key=lambda l: l.created_at)
+        return letters_new, letters_old
+
+    async def update_letter(self, letter_id: int, **kwargs) -> None:
+        return await self.update(self.model.letter_id == letter_id, **kwargs)
+
+    async def delete_letter(self, letter_id: int):
+        return await self.delete(self.model.letter_id == letter_id)
+
+
+class JoinRepo(BaseRepo[Join]):
+    model = Join
+
+    async def get_join(self, join_id: int) -> Join:
+        return await self.get_one(self.model.join_id == join_id)
+
+    async def get_post_join(self, customer_id: int, executor_id: int, post_id: int):
+        return await self.get_one(self.model.customer_id == customer_id,
+                                  self.model.executor_id == executor_id,
+                                  self.model.post_id == post_id)
+
+    async def update_join(self, join_id: int, **kwargs) -> None:
+        return await self.update(self.model.join_id == join_id, **kwargs)
+
+    async def delete_join(self, join_id: int):
+        return await self.delete(self.model.join_id == join_id)

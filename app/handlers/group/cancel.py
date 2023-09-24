@@ -100,7 +100,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         await bot.send_message(user_id, text)
 
     if deal.type == DealTypeEnum.PUBLIC:
-        if deal.is_template_photo:
+        if deal.no_media:
             new_post_photo = make_post_media_template(post.title, post.about, post.price)
             photo_message = await bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
             await post_db.update_post(post.post_id, media_url=photo_message.url)
@@ -109,7 +109,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             await bot.delete_message(config.misc.post_channel_chat_id, post.message_id)
             post_channel = await bot.send_message(
                 config.misc.post_channel_chat_id, post.construct_post_text(),
-                reply_markup=participate_kb(await post.construct_participate_link()),
+                reply_markup=participate_kb(await post.participate_link),
                 disable_web_page_preview=True if not post.message_id else False
             )
             await post_db.update_post(post.post_id, message_id=post_channel.message_id, post_url=post_channel.url)
@@ -117,7 +117,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             await bot.delete_message(config.misc.reserv_channel_id, post.reserv_message_id)
             reserv_channel = await bot.send_message(
                 config.misc.reserv_channel_id, post.construct_post_text(),
-                reply_markup=participate_kb(await post.construct_participate_link()),
+                reply_markup=participate_kb(await post.participate_link),
                 disable_web_page_preview=True if not post.message_id else False
             )
             await post_db.update_post(post.post_id, reserv_message_id=reserv_channel.message_id)
@@ -205,7 +205,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await call.bot.send_message(deal.customer_id, text, reply_markup=evaluate_deal_kb(deal))
         await post_db.update_post(post.post_id, status=DealStatusEnum.DONE)
         if deal.type == DealTypeEnum.PUBLIC:
-            if deal.is_template_photo:
+            if deal.no_media:
                 new_post_photo = make_post_media_template(post.title, post.about, post.price, version='done')
                 photo_message = await call.bot.send_photo(config.misc.media_channel_chat_id, InputFile(new_post_photo))
                 await post_db.update_post(post.post_id, media_url=photo_message.url)

@@ -46,7 +46,7 @@ async def after_public_edit_kb(post: Post):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[
-            [InlineKeyboardButton(Buttons.post.manage_post, url=await post.construct_manage_link())]
+            [InlineKeyboardButton(Buttons.post.manage_post, url=await post.manage_link)]
         ]
     )
 

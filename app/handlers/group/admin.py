@@ -239,6 +239,6 @@ async def construct_deal_text(deal: DealRepo.model, post_db: PostRepo, user_db: 
         f'Пост: {post.construct_html_link(post.title)}\n'
         f'Замовник: {customer.mention}\n'
         f'Виконавець: {executor.mention}\n'
-        f'Ціна угоди: {deal.construct_price()}\n'
-        f'Статус оплати: {deal.chat_status()}'
+        f'Ціна угоди: {deal.deal_price}\n'
+        f'Статус оплати: {deal.chat_status}'
     )

@@ -13,6 +13,7 @@ from app.handlers.private import pay
 from app.handlers.private import evaluate
 from app.handlers.private import back
 from app.handlers.private import new_deal
+from app.handlers.private import my_letters
 
 
 def setup(dp: Dispatcher):
@@ -27,5 +28,6 @@ def setup(dp: Dispatcher):
     my_chats.setup(dp)
     my_rating.setup(dp)
     my_balance.setup(dp)
+    my_letters.setup(dp)
     evaluate.setup(dp)
     back.setup(dp)

@@ -1,60 +1,110 @@
+import re
+
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.markdown import hide_link
 
-from app.database.services.repos import DealRepo, PostRepo, UserRepo
-from app.keyboards.inline.deal import moderate_deal_kb, deal_cb, pagination_deal_kb, comment_cb
+from app.config import Config
+from app.database.services.enums import JoinStatusEnum
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, JoinRepo, LetterRepo
+from app.keyboards.inline.deal import moderate_deal_kb, deal_cb, pagination_deal_kb, comment_cb, send_deal_kb
 from app.states.states import ParticipateSG
-
 
 MAX_CHAR_IN_MESSAGE = 4096
 
+def is_valid_comment(text: str) -> dict:
+    for word in text.split(' '):
+        if any([re.match(r'@([A-z]+)$', word), re.match(r'https?\S+', word)]):
+            return {'status': 'not valid'}
+    else:
+        if re.match(r'([A-z]+)', text):
+            return {'status': 'suspiciously'}
+        else:
+            return {'status': 'ok'}
 
-async def save_deal_comment(msg: Message, state: FSMContext):
-    await msg.reply('Ваш коментар було збережено. Якщо хочете перезаписати його, відправте новий коментар знову.')
-    await state.update_data(comment=msg.html_text)
 
-
-async def close_deal_cmd(call: CallbackQuery, state: FSMContext):
-    await state.finish()
-    await call.message.delete()
-
-
-async def send_deal_cmd(call: CallbackQuery, state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                        user_db: UserRepo):
+async def save_deal_comment(msg: Message, join_db: JoinRepo, config: Config, state: FSMContext):
+    await msg.delete()
     data = await state.get_data()
-    deal_id = data['deal_id']
-    comment = data['comment']
-    deal = await deal_db.get_deal(deal_id)
-    post = await post_db.get_post(deal.post_id)
-    user = await user_db.get_user(call.from_user.id)
-    willing_ids = deal.willing_ids
-    if call.from_user.id not in willing_ids:
-        willing_ids.append(call.from_user.id)
-        await deal_db.update_deal(data['deal_id'], willing_ids=willing_ids)
-    comment = f'\n\nКоментар:\n{comment}' if comment else ''
+    join = await join_db.get_join(data['join_id'])
+    ban = False
+    if join:
+        text_status = is_valid_comment(msg.text)['status']
+        if text_status == 'not valid':
+            text = (
+                '<b>Твій коментар було відхилено.</b>\n\n'
+                'Оскільки він містить заборонені посилання або теги. '
+                'Якщо хочеш перезаписати його, відправ новий коментар знову.'
+            )
+            ban = True
+        else:
+            text = (
+                '<b>Твій коментар було збережено.</b>\n\n'
+                'Якщо хочеш перезаписати його, відправ новий коментар знову.\n\n'
+                f'Твій коментар: <i>{msg.text}</i>'
+            )
+            await join_db.update_join(join.join_id, comment=msg.text)
+            if text_status != 'ok':
+                warning = (
+                    f'#ПідозрілийВислів\n\n'
+                    f'Користувач {msg.from_user.get_mention()} ({msg.from_user.id}) '
+                    f'використав підозрілий вираз в своєму коментарі на виконання запиту:\n\n'
+                    f'<i>{msg.text}</i>'
+                )
+                await msg.bot.send_message(
+                    config.misc.admin_channel_id, warning)
+        await msg.bot.edit_message_text(text, chat_id=msg.from_user.id, message_id=join.join_msg_id,
+                                        reply_markup=send_deal_kb(join, ban=ban))
+    else:
+        await msg.answer('Нажаль я не можу отримати інформацію про твій запит. Будь ласка спробуй ще раз')
+
+
+async def close_deal_cmd(call: CallbackQuery, callback_data: dict, join_db: JoinRepo, state: FSMContext):
+    await state.finish()
+    join = await join_db.get_join(int(callback_data['join_id']))
+    if join:
+        await call.bot.delete_message(call.from_user.id, join.join_msg_id)
+        await call.bot.delete_message(call.from_user.id, join.post_msg_id)
+    else:
+        await call.answer('Нажаль я не можу отримати інформацію про твій запит')
+        await call.message.delete()
+
+async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
+                        user_db: UserRepo, join_db: JoinRepo, letter_db: LetterRepo, state: FSMContext):
+    join = await join_db.get_join(int(callback_data['join_id']))
+    post = await post_db.get_post(join.post_id)
+    user = await user_db.get_user(join.executor_id)
+    deal = await deal_db.get_deal(join.deal_id)
+    comment = f'\n\nКоментар: {join.comment}' if join.comment else ''
     text_to_customer = (
         f'{await user.construct_preview_text(deal_db)}'
         f'{comment} {hide_link(post.post_url)}\n'
     )
     is_comment_deals = await deal_db.get_comment_deals(call.from_user.id)
-    await call.bot.send_message(deal.customer_id, text_to_customer,
-                                reply_markup=moderate_deal_kb(deal, call.from_user.id, is_comment_deals=is_comment_deals))
-    await call.message.delete()
-    text_to_executor = (
-        f'Ви відправили запит на виконання завдання "{post.title}" {hide_link(post.post_url)} 👌'
+    await call.bot.send_message(
+        deal.customer_id, text_to_customer,
+        reply_markup=moderate_deal_kb(join, is_comment_deals=is_comment_deals))
+    await letter_db.add(
+        text=text_to_customer, user_id=deal.customer_id, join_id=join.join_id
     )
-    await call.message.answer(text_to_executor)
+    await call.bot.delete_message(call.from_user.id, join.post_msg_id)
+    text_to_executor = (
+        f'<b>Ви відправили запит на виконання завдання 👌</b>\n\n'
+        f'Завдання: {post.title} {hide_link(post.post_url)}'
+    )
+    await join_db.update_join(join.join_id, status=JoinStatusEnum.ACTIVE)
+    await call.message.edit_text(text_to_executor)
+    await letter_db.add(text=text_to_executor, user_id=call.from_user.id, join_id=join.join_id)
     await state.finish()
 
 
 async def pagination_comments_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                  post_db: PostRepo):
-    executor_id = int(callback_data['executor_id'])
-    executor = await user_db.get_user(executor_id)
-    deals = await deal_db.get_comment_deals(executor_id=executor_id)
+                                  post_db: PostRepo, join_db: JoinRepo):
+    join = await join_db.get_join(int(callback_data['join_id']))
+    executor = await user_db.get_user(join.executor_id)
+    deals = await deal_db.get_comment_deals(executor_id=join.executor_id)
 
     sort_type_list = ['None', 'max', 'min']
     sort = callback_data['sort']
@@ -93,42 +143,44 @@ async def pagination_comments_cmd(call: CallbackQuery, callback_data: dict, deal
             break
         comment_counter += 1
     text += page.format(current_deal_index + 1, current_deal_index + comment_counter, len(deals_id))
-    reply_markup = pagination_deal_kb(executor_id, deals_id, deal_id, original_id, sort)
+    reply_markup = pagination_deal_kb(join.executor_id, deals_id, deal_id, original_id, sort)
     await call.message.edit_text(text, reply_markup=reply_markup)
 
 
 async def back_send_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                         user_db: UserRepo):
+                         user_db: UserRepo, join_db: JoinRepo):
     deal_id = int(callback_data['original_id'])
     executor_id = int(callback_data['executor_id'])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
     user = await user_db.get_user(call.from_user.id)
+    join = await join_db.get_post_join(deal.customer_id, deal.executor_id, deal.post_id)
     comment = f'Коментар:\n\n{deal.comment}' if deal.comment else ''
     text_to_customer = (
         f'{await user.construct_preview_text(deal_db)}'
         f'{comment} {hide_link(post.post_url)}'
     )
     is_comment_deals = await deal_db.get_comment_deals(executor_id)
-    reply_markup = moderate_deal_kb(deal, executor_id, is_comment_deals=is_comment_deals)
+    reply_markup = moderate_deal_kb(join=join, is_comment_deals=is_comment_deals)
     await call.message.edit_text(text_to_customer, reply_markup=reply_markup)
 
 
 async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                          user_db: UserRepo):
-    deal_id = int(callback_data['deal_id'])
-    executor_id = int(callback_data['executor_id'])
-    deal = await deal_db.get_deal(deal_id)
-    post = await post_db.get_post(deal.post_id)
-    executor = await user_db.get_user(executor_id)
-    text_to_customer = (
-        f'Ви відхилили запит на виконнання вашого завдання від {executor.full_name} {hide_link(post.post_url)}'
+                          user_db: UserRepo, join_db: JoinRepo, letter_db: LetterRepo):
+    join = await join_db.get_join(int(callback_data['join_id']))
+    post = await post_db.get_post(join.post_id)
+    executor = await user_db.get_user(join.executor_id)
+    await letter_db.add(
+        text=f'Ви відхилили запит на виконнання вашого завдання від {executor.full_name} {hide_link(post.post_url)}',
+        user_id=join.customer_id, join_id=join.join_id
     )
     text_to_executor = (
         f'Ваш запит на виконання завдання був відхилений замовником {hide_link(post.post_url)}'
     )
-    await call.message.edit_text(text_to_customer)
-    await call.bot.send_message(executor_id, text_to_executor)
+    await letter_db.add(
+        text=text_to_executor, user_id=join.executor_id, join_id=join.join_id
+    )
+    await call.bot.send_message(join.executor_id, text_to_executor)
 
 
 def setup(dp: Dispatcher):

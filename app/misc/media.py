@@ -2,50 +2,63 @@ import os
 
 from PIL import ImageFont, ImageDraw, Image
 
+from app.database.services.enums import PostStatusText
+
 
 def create_new_filename():
-    return f'app/data/photo_{len(os.listdir("app/data/"))+1}.png'
+    test = False
+    if test:
+        return 'app/data/photo.png'
+    else:
+        return f'app/data/photo_{len(os.listdir("app/data/"))+1}.jpg'
 
-def make_post_media_template(title: str, description: str, price: int, version: str = 'orig'):
-    price = 'Договірна' if price == 0 else f'{price} грн.'
-    logo = Image.open(f"app/data/template-{version}.png")
-    font = ImageFont.truetype('calibri.ttf', 65)
+def make_post_media_template(title: str, description: str, price: int, version: str = 'active'):
+    price = 'Договірна' if price == 0 else f'{price} грн'
+    logo = Image.open(f"app/data/{version}.jpg")
+    font = ImageFont.truetype('RockStar-Bold.ttf', 96)
     drawer = ImageDraw.Draw(logo)
-    drawer.text((50, 110), split_string(title, 22), fill='black', font=font, stroke_width=1)
-    font = ImageFont.truetype('calibri.ttf', 35)
-    y_pos = 205 + 50 * (len(title) // 23)
-    drawer.text((50, y_pos), split_string(description), fill='#afafaf', font=font)
-    drawer.text((50, 500), f'Ціна: {price}', fill='#afafaf', font=font)
+    drawer.text((110, 130), split_string(title, 18), fill='#000000', font=font)
+    font = ImageFont.truetype('RockStar-Bold.ttf', 50)
+    y_pos = 280 + 50 * (len(title) // 18)
+    drawer.text((110, y_pos), split_string(description), fill='#4D4D4D', font=font)
+    font = ImageFont.truetype('RockStar-Bold.ttf', 58)
+    status = {
+        'active': PostStatusText.ACTIVE,
+        'process': PostStatusText.BUSY,
+        'done': PostStatusText.DONE
+    }
+    drawer.text((220, 560), status[version].split(' ')[-1], fill='#000000', font=font)
+    drawer.text((220, 680), f'{price}', fill='#000000', font=font)
     new_path = create_new_filename()
     logo.save(new_path)
     return new_path
 
 
 def make_admin_media_template(room_name: str, reason: str, status: str, file: str):
-    logo = Image.open(f'app/data/template-admin-{file}.png')
-    font = ImageFont.truetype('calibri.ttf', 55)
+    logo = Image.open(f'app/data/{file}-admin.jpg')
+    font = ImageFont.truetype('RockStar-Bold.ttf', 80)
     drawer = ImageDraw.Draw(logo)
-    drawer.text((50, 70), f'Адміністратор в {room_name}', fill='black', font=font, stroke_width=1)
-    font = ImageFont.truetype('calibri.ttf', 35)
-    drawer.text((50, 155), split_string(reason), fill='#afafaf', font=font)
-    drawer.text((50, 325), f'Статус: {status}', fill='#afafaf', font=font)
+    drawer.text((110, 130), f'Адміністратор в {room_name}', fill='#000000', font=font)
+    font = ImageFont.truetype('RockStar-Bold.ttf', 50)
+    drawer.text((110, 250), split_string(reason), fill='#4D4D4D', font=font)
+    font = ImageFont.truetype('RockStar-Bold.ttf', 58)
+    drawer.text((220, 680), f'{status}', fill='#000000', font=font)
     new_path = create_new_filename()
     logo.save(new_path)
     return new_path
 
 
 def make_chat_photo_template(number: int):
-    logo = Image.open(f'app/data/chat_photo.png')
-    font = ImageFont.truetype('calibri.ttf', 100)
+    logo = Image.open(f'app/data/chat.jpg')
+    font = ImageFont.truetype('Helvetica 77 Bold Condensed.otf', 180)
     drawer = ImageDraw.Draw(logo)
-    y_pos = 300 - 30 * (len(str(number)) - 1)
-    drawer.text((y_pos, 265), f'{number}', fill='#333333', font=font, stroke_width=1)
+    drawer.text((367, 367), f'#{number}', fill='#0087EB', font=font, anchor='mm')
     new_path = create_new_filename()
     logo.save(new_path)
     return new_path
 
 
-def split_string(text: str, max_string_length: int = 45, max_text_length: int = 255):
+def split_string(text: str, max_string_length: int = 30, max_text_length: int = 110):
     text = text.replace('\n', ' ').replace('.', '. ').replace('!', '! ').replace('?', '? ')
     text = text.replace('.  ', '. ').replace('!  ', '! ').replace('?  ', '? ')
     words = text.split(' ')
@@ -65,8 +78,4 @@ def split_string(text: str, max_string_length: int = 45, max_text_length: int = 
         else:
             new_text += ' '
     return new_text
-
-
-
-
 

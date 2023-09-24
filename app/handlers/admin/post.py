@@ -3,14 +3,13 @@ from datetime import timedelta
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery
-from aiogram.utils.deep_linking import get_start_link
 from aiogram.utils.markdown import hide_link
 from apscheduler_di import ContextSchedulerDecorator
 
 from app.config import Config
 from app.database.models import Post
 from app.database.services.enums import DealStatusEnum
-from app.database.services.repos import PostRepo, UserRepo, DealRepo, MarkerRepo
+from app.database.services.repos import PostRepo, UserRepo, DealRepo, MarkerRepo, LetterRepo
 from app.filters import IsAdminFilter
 from app.keyboards.inline.moderate import confirm_post_moderate, moderate_post_kb, moderate_post_cb, \
     after_public_edit_kb, public_all_post_cb, public_post_cb
@@ -158,7 +157,7 @@ async def publish_all_posts_processing(call: CallbackQuery, callback_data: dict,
 
 
 async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
-                            marker_db: MarkerRepo, user_db: UserRepo, config: Config,
+                            marker_db: MarkerRepo, user_db: UserRepo, letter_db: LetterRepo, config: Config,
                             scheduler: ContextSchedulerDecorator):
     admin_id = int(callback_data['admin_id'])
     admin = await user_db.get_user(admin_id)
@@ -169,14 +168,15 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     await post_db.update_post(post_id, status=DealStatusEnum.ACTIVE)
     message = await call.bot.send_message(
         config.misc.reserv_channel_id, post.construct_post_text(),
-        reply_markup=participate_kb(await post.construct_participate_link()),
+        reply_markup=participate_kb(await post.participate_link),
         disable_web_page_preview=True if not post.media_id else False
     )
     await post_db.update_post(post_id, reserv_message_id=message.message_id)
     await deal_db.update_deal(post.deal_id, status=DealStatusEnum.ACTIVE)
     scheduler.add_job(
         publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
-        kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db, user_db=user_db),
+        kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db, user_db=user_db,
+                    letter_db=letter_db),
         name=f'Публікація поста #{post.post_id} на основному каналі'
     )
     admin_channel_text = (
@@ -190,17 +190,20 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
 
 
 async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, user_db: UserRepo,
-                                    config: Config):
+                                    letter_db: LetterRepo, config: Config):
     post = await post_db.get_post(post.post_id)
     if post:
-        reply_markup = participate_kb(await post.construct_participate_link()) if post.status == DealStatusEnum.ACTIVE else None
+        reply_markup = participate_kb(await post.participate_link) if post.status == DealStatusEnum.ACTIVE else None
         message = await bot.send_message(
             config.misc.post_channel_chat_id, post.construct_post_text(),
             reply_markup=reply_markup, disable_web_page_preview=True if not post.media_id else False
         )
-        await get_start_link('post-1')
         await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
-        await bot.send_message(post.user_id, text=f'Ваш пост "{post.title}" опубліковано {hide_link(message.url)}')
+        await bot.send_message(post.user_id, text=f'Ваш пост опубліковано {hide_link(message.url)}')
+        await letter_db.add(
+            text=f'Ваш {post.construct_html_link("пост")} було опубліковано',
+            user_id=post.user_id, post_id=post.post_id
+        )
         await markers_post_processing(marker_db, post, bot, message.url, user_db)
 
 

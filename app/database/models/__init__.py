@@ -6,3 +6,5 @@ from app.database.models.marker import Marker
 from app.database.models.commission import Commission
 from app.database.models.setting import Setting
 from app.database.models.order import Order
+from app.database.models.join import Join
+from app.database.models.letter import Letter
