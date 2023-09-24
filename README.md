@@ -15,8 +15,8 @@ Scalable and straightforward template for bots written in [aiogram](https://gith
 #### Preparations
 
 1. Clone this repo via:
-    - HTTPS `git clone https://github.com/illustratumq/aiogram-v2-template`
-    - SSH `git clone git@github.com:illustratumq/aiogram-v2-template.git`
+    - HTTPS `git clone https://github.com/illustratumq/what-is-there-bot`
+    - SSH `git clone git@github.com:illustratumq/what-is-there-bot.git`
 2. Move to the directory `cd aiogram-v2-template`
 3. Rename `env.example` to `.env` and replace variables to your own
 
