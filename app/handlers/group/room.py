@@ -30,7 +30,8 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     if 'last_msg_id' in data.keys():
         await cjr.bot.delete_message(cjr.from_user.id, data['last_msg_id'])
     if deal.customer_id in members and deal.executor_id in members:
-        await deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(hours=12))
+        await deal_db.update_deal(
+            deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
         await full_room_action(cjr, deal, user_db, post_db, config)
     else:
         await cjr.bot.send_message(
@@ -53,7 +54,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
         await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True,
                                   reply_markup=reply_markup)
     except Exception as Error:
-        await call.message.answer(f'Схоже юззербот не може додати вас у чат, причина:\n\n{Error}',
+        await call.message.answer(f'Схоже юзербот не може додати вас у чат, причина:\n\n{Error}',
                                   reply_markup=reply_markup)
     await set_new_room_commands(call.bot, deal.chat_id, admin_id)
     await deal_db.update_deal(deal.deal_id, next_activity_date=None)
@@ -135,12 +136,13 @@ async def send_media_chat(call: CallbackQuery, callback_data: dict, deal_db: Dea
     )
 
 
-async def confirm_room_activity(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo):
+async def confirm_room_activity(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
+                                config: Config):
     await call.message.delete()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     await deal_db.update_deal(deal.deal_id, activity_confirm=True,
-                              next_activity_date=datetime.now() + timedelta(hours=12))
+                              next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
     user = await user_db.get_user(call.from_user.id)
     text = (
         f'✅ {user.create_html_link("Замовник" if user.user_id == deal.customer_id else "Виконавець")} підтвердив '

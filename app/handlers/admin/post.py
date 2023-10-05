@@ -74,7 +74,7 @@ async def publish_all_confirm(call: CallbackQuery, callback_data: dict, post_db:
 
 
 async def publish_all_posts_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, user_db: UserRepo,
-                                deal_db: DealRepo, marker_db: MarkerRepo, state: FSMContext,
+                                deal_db: DealRepo, marker_db: MarkerRepo, state: FSMContext, letter_db: LetterRepo,
                                 scheduler: ContextSchedulerDecorator, config: Config):
     await state.finish()
     delay = int(callback_data['delay'])
@@ -89,7 +89,7 @@ async def publish_all_posts_cmd(call: CallbackQuery, callback_data: dict, post_d
             func=publish_all_posts_processing, name=f'Публікація поста в резервному каналі через {delay} c.',
             next_run_time=next_run_time(delay), trigger='date', misfire_grace_time=300,
             kwargs=dict(call=call, callback_data=callback_data, post_db=post_db, deal_db=deal_db,
-                        marker_db=marker_db, user_db=user_db)
+                        marker_db=marker_db, user_db=user_db, letter_db=letter_db)
         )
         delay += delay
     await call.answer('Публікація постів успішно запланована', show_alert=True)
@@ -135,7 +135,7 @@ async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: Po
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     admin_channel_text = (
-        f'<b>Статус:</b> Пост #{post.post_id} відхиилено\n'
+        f'<b>Статус:</b> Пост #{post.post_id} відхилено\n'
         f'<b>Модератор:</b> {call.from_user.mention}\n\n'
         f'{post.construct_post_text(use_bot_link=False)}'
     )
@@ -147,13 +147,13 @@ async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: Po
 
 
 async def publish_all_posts_processing(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
-                                       marker_db: MarkerRepo, user_db: UserRepo, config: Config,
+                                       marker_db: MarkerRepo, user_db: UserRepo, config: Config, letter_db: LetterRepo,
                                        scheduler: ContextSchedulerDecorator):
     posts = await post_db.get_posts_status(DealStatusEnum.WAIT)
-    posts.sort(key=lambda p: p.created_at, reverse=True)
+    posts.sort(key=lambda p: p.created_at)
     post = posts[0]
     callback_data.update(post_id=post.post_id)
-    await admin_approve_cmd(call, callback_data, post_db, deal_db, marker_db, user_db, config, scheduler)
+    await admin_approve_cmd(call, callback_data, post_db, deal_db, marker_db, user_db, letter_db, config, scheduler)
 
 
 async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, deal_db: DealRepo,
@@ -176,7 +176,7 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     scheduler.add_job(
         publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
         kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db, user_db=user_db,
-                    letter_db=letter_db),
+                    letter_db=letter_db, config=config),
         name=f'Публікація поста #{post.post_id} на основному каналі'
     )
     admin_channel_text = (

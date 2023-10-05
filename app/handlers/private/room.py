@@ -68,7 +68,7 @@ async def refuse_admin_enter_chat(call: CallbackQuery, callback_data: dict, deal
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     room = await room_db.get_room(deal.chat_id)
-    await call.bot.delete_message(config.misc.admin_channel_id, room.message_id)
+    await call.bot.delete_message(config.misc.admin_help_channel_id, room.message_id)
     text = await room.construct_admin_moderate_text(room_db, call.bot, config)
     msg = await call.bot.send_message(config.misc.admin_channel_id, text, reply_markup=await help_admin_kb(deal.deal_id))
     await room_db.update_room(room.chat_id, message_id=msg.message_id)

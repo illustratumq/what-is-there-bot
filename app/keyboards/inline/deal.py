@@ -11,7 +11,7 @@ comment_cb = CallbackData('cm', 'original_id', 'deal_id', 'executor_id', 'action
 def send_deal_kb(join: Join, delete: bool = False, ban: bool = False):
 
     def button_cb(action: str):
-        return dict(callback_data=deal_cb.new(join_id=join.join_id, action=action))
+        return dict(callback_data=deal_cb.new(join_id=join.join_id if join else 'None', action=action))
 
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.post.send_deal, **button_cb('send')),

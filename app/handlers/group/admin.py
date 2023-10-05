@@ -90,7 +90,7 @@ async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: Use
                                                    f'була завершена адміністратором')
     text_to_channel = await room.construct_admin_moderate_text(room_db, call.bot, config, admin,
                                                                done_action='Завершено')
-    await call.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
+    await call.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
     await call.message.answer(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно завершена!')
     await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db,
                                room_db, commission_db, userbot, config)
@@ -107,7 +107,7 @@ async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: U
                                                    f'була відмінена адміністратором')
     text_to_channel = await room.construct_admin_moderate_text(room_db,  call.bot, config, admin,
                                                                done_action='Завершено')
-    await call.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
+    await call.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
     await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db,
                                  post_db, user_db, room_db, commission_db, userbot, config,
                                  message=f'🔔 Ваша угода "{post.title}", була відмінена адміністратором')

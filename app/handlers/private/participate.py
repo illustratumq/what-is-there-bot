@@ -67,12 +67,14 @@ async def close_deal_cmd(call: CallbackQuery, callback_data: dict, join_db: Join
     if join:
         await call.bot.delete_message(call.from_user.id, join.join_msg_id)
         await call.bot.delete_message(call.from_user.id, join.post_msg_id)
+        if join.one_time_join:
+            await join_db.delete_join(join.join_id)
     else:
         await call.answer('Нажаль я не можу отримати інформацію про твій запит')
         await call.message.delete()
 
 async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                        user_db: UserRepo, join_db: JoinRepo, letter_db: LetterRepo, state: FSMContext):
+                        user_db: UserRepo, join_db: JoinRepo, state: FSMContext):
     join = await join_db.get_join(int(callback_data['join_id']))
     post = await post_db.get_post(join.post_id)
     user = await user_db.get_user(join.executor_id)
@@ -86,9 +88,6 @@ async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealR
     await call.bot.send_message(
         deal.customer_id, text_to_customer,
         reply_markup=moderate_deal_kb(join, is_comment_deals=is_comment_deals))
-    await letter_db.add(
-        text=text_to_customer, user_id=deal.customer_id, join_id=join.join_id
-    )
     await call.bot.delete_message(call.from_user.id, join.post_msg_id)
     text_to_executor = (
         f'<b>Ви відправили запит на виконання завдання 👌</b>\n\n'
@@ -96,7 +95,6 @@ async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealR
     )
     await join_db.update_join(join.join_id, status=JoinStatusEnum.ACTIVE)
     await call.message.edit_text(text_to_executor)
-    await letter_db.add(text=text_to_executor, user_id=call.from_user.id, join_id=join.join_id)
     await state.finish()
 
 
@@ -171,9 +169,11 @@ async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     post = await post_db.get_post(join.post_id)
     executor = await user_db.get_user(join.executor_id)
     await letter_db.add(
-        text=f'Ви відхилили запит на виконнання вашого завдання від {executor.full_name} {hide_link(post.post_url)}',
+        text=f'Ви відхилили запит на виконнання вашого завдання від {executor.full_name}\n\nЗавдання: {post.title}',
         user_id=join.customer_id, join_id=join.join_id
     )
+    await call.message.delete()
+    await call.answer(f'Ви відхилили запит на виконнання вашого завдання від {executor.full_name}')
     text_to_executor = (
         f'Ваш запит на виконання завдання був відхилений замовником {hide_link(post.post_url)}'
     )

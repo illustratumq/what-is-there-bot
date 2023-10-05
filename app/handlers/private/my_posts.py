@@ -87,26 +87,31 @@ async def confirm_delete_post_cmd(call: CallbackQuery, callback_data: dict, post
     await back_posts_list_cmd(call, post_db)
 
 
-async def update_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo, config: Config):
+async def update_post_cmd(call: CallbackQuery, callback_data: dict, post_db: PostRepo,
+                          deal_db: DealRepo, config: Config):
     post_id = int(callback_data['post_id'])
     post = await post_db.get_post(post_id)
     seconds_after_public = (now() - localize(post.updated_at)).seconds
     if seconds_after_public >= 15*60:
         if post.post_id:
-            await call.bot.delete_message(
-                config.misc.post_channel_chat_id, post.message_id
-            )
+            if post.message_id:
+                await call.bot.delete_message(
+                    config.misc.post_channel_chat_id, post.message_id
+                )
+            if post.reserv_message_id:
+                await call.bot.delete_message(
+                    config.misc.post_channel_chat_id, post.reserv_message_id
+                )
         msg = await call.bot.send_message(
             config.misc.post_channel_chat_id, text=post.construct_post_text(),
-            reply_markup=participate_kb(await post.construct_participate_link())
+            reply_markup=participate_kb(await post.participate_link)
         )
         await call.answer('Ваш пост було оновлено в каналі', show_alert=True)
         await post_db.update_post(post.post_id, message_id=msg.message_id, post_url=msg.url)
-        await edit_post_cmd(call, callback_data, post_db)
+        await edit_post_cmd(call, callback_data, post_db, deal_db)
     else:
         text = (
-            f'Ви можете оновлювати пост в каналі не раніше ніж 15 хв після його публікації '
-            f'(залишилось {(15 * 60 - seconds_after_public) // 60} хв...)'
+            f'Наступне оновлння в каналі можливе через {(15 * 60 - seconds_after_public) // 60} хв.'
         )
         await call.answer(text, show_alert=True)
 

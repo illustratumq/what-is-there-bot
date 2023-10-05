@@ -18,3 +18,4 @@ class Join(TimedBaseModel):
 
     comment = sa.Column(sa.VARCHAR(500), nullable=True)
     status = sa.Column(ENUM(JoinStatusEnum), nullable=False, default=JoinStatusEnum.EDIT)
+    one_time_join = sa.Column(sa.BOOLEAN, nullable=False, default=False)

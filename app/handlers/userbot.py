@@ -37,6 +37,7 @@ class UserbotController:
         members = []
         await self.connect()
         client = self._client
+        # async with self._client as client:
         async for member in client.get_chat_members(chat_id):
             member: ChatMember
             members.append(member.user.id)

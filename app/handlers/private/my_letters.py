@@ -27,11 +27,16 @@ async def paginate_letters(upd: CallbackQuery | Message, callback_data: dict, le
     letter = await letter_db.get_letter(int(callback_data['letter_id']))
     letters_new, letters_old = await letter_db.get_all_user_letters(upd.from_user.id)
 
+    if not letter.read:
+        marker = '🆕✉'
+    else:
+        marker = '✉'
+
     text = (
-        f'<b>✉ Повідомлення️</b> (ID{letter.letter_id})\n'
-        f'Отримано {localize(letter.created_at).strftime("%H:%M:%S %d.%m.%y")}\n'
-        f'Всього: {len(letters_new) + len(letters_old)} / Непрочитаних: {len(letters_new)}\n\n'
-        f'<i>«{letter.text.strip()}»</i>\n\n'
+        f'<b>{marker} Повідомлення️ №{letter.letter_id}</b>\n'
+        f'Непрочитаних: {len(letters_new)}/{len(letters_new) + len(letters_old)}\n\n'
+        f'<i>{letter.text.strip()}\n\n'
+        f'Отримано {localize(letter.created_at).strftime("%H:%M:%S %d.%m.%y")}</i>\n'
     )
 
     try:

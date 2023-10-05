@@ -67,24 +67,29 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
     post_msg = await msg.answer(post.construct_post_text(use_bot_link=False))
     join = await join_db.get_post_join(deal.customer_id, msg.from_user.id, post.post_id)
     delete = False
+    one_time_join = False
     if not deal:
         text = (
             f'<b>Ти не можеш стати виконавцем завдання</b>\n\n'
             f'Схоже ця угода вже не актуальна'
         )
         delete = True
+        one_time_join = True
     elif deal.status != DealStatusEnum.ACTIVE:
         text = (
              f'<b>Ти не можеш стати виконавцем завдання</b>\n\n'
              f'Ти не можеш долучитися до цього завдання, оскільки воно вже не активне'
         )
         delete = True
-    # elif deal.customer_id == msg.from_user.id:
-    #     text = 'Ти не можеш долучитися до свого ж завдання'
-    #     delete = True
+        one_time_join = True
+    elif deal.customer_id == msg.from_user.id:
+        text = 'Ти не можеш долучитися до свого ж завдання'
+        delete = True
+        one_time_join = True
     # elif user.type == UserTypeEnum.ADMIN:
     #     text = 'Ти не можеш долучатись до завдань, будучи адміністратором'
     #     delete = True
+    #     one_time_join = True
     elif join and join.status == JoinStatusEnum.EDIT and join.comment:
         text = (
             f'<b>Ти хочеш стати виконавцем завдання?</b>\n\n'
@@ -110,9 +115,9 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
             f'"{Buttons.post.send_deal}" (ти також можеш зробити це без коментаря).\n\n'
             f'<i>Рекомендація</i>: Розкажіть чому замовник має обрати саме тебе.'
         )
-        if not join:
-            join = await join_db.add(deal_id=deal_id, post_id=post.post_id, customer_id=post.user_id,
-                                     executor_id=msg.from_user.id)
+    if not join:
+        join = await join_db.add(deal_id=deal_id, post_id=post.post_id, customer_id=post.user_id,
+                                 executor_id=msg.from_user.id, one_time_join=one_time_join)
     join_msg = await msg.answer(text, reply_markup=send_deal_kb(join, delete))
     await join_db.update_join(join.join_id, post_msg_id=post_msg.message_id, join_msg_id=join_msg.message_id)
     await ParticipateSG.Comment.set()
@@ -141,7 +146,7 @@ async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, p
         f'Статус оплати: {deal.chat_status}\n\n'
     )
     text_to_channel = await room.construct_admin_moderate_text(room_db, msg.bot, config, admin)
-    message = await msg.bot.edit_message_text(text_to_channel, config.misc.admin_channel_id, room.message_id)
+    message = await msg.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
     await room_db.update_room(deal.chat_id, admin_id=admin.user_id, message_id=message.message_id)
     await msg.answer(text_to_admin, reply_markup=add_admin_chat_kb(deal, admin))
 

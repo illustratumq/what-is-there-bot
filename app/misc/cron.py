@@ -69,18 +69,20 @@ def setup_cron_function(scheduler: ContextSchedulerDecorator):
     #scheduler.add_job(
     #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     #)
+    # scheduler.add_job(
+    #     func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
+    # )
+    scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
     scheduler.add_job(
-        func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
+       func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
     )
-    #scheduler.add_job(
-    #    func=checking_chat_activity_func, trigger='interval', seconds=1800, name='Перевірка активності чатів'
-    #)
     log.info('Функції додані в cron...')
 
 
 async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: UserbotController, config: Config):
     db = database(session)
     for deal in await db.deal_db.get_deal_status(DealStatusEnum.BUSY):
+        print(localize(deal.next_activity_date), localize(deal.next_activity_date) <= now())
         if deal.payed == 0 and deal.next_activity_date and localize(deal.next_activity_date) <= now():
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
@@ -92,8 +94,9 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                     f'вона буде автоматично відмінена.'
                 )
                 await bot.send_message(deal.chat_id, text, reply_markup=confirm_deal_activity(deal))
-                await db.deal_db.update_deal(deal.deal_id, next_activity_date=datetime.now() + timedelta(hours=12),
-                                             activity_confirm=False)
+                await db.deal_db.update_deal(
+                    deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period),
+                    activity_confirm=False)
             else:
                 post = await db.post_db.get_post(deal.post_id)
                 message = (

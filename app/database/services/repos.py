@@ -228,8 +228,8 @@ class LetterRepo(BaseRepo[Letter]):
     async def get_all_user_letters(self, user_id: int) -> list[Letter]:
         letters_new = await self.get_new_letters_user(user_id)
         letters_old = await self.get_all(self.model.user_id == user_id, self.model.read == True)
-        letters_new.sort(key=lambda l: l.created_at)
-        letters_old.sort(key=lambda l: l.created_at)
+        letters_new.sort(key=lambda l: l.created_at, reverse=True)
+        letters_old.sort(key=lambda l: l.created_at, reverse=True)
         return letters_new, letters_old
 
     async def update_letter(self, letter_id: int, **kwargs) -> None:
