@@ -150,7 +150,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             await deal_db.update_deal(deal.deal_id, customer_id=None)
 
     join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
-    await join_db.update_join(join.join_id, status=JoinStatusEnum.EDIT)
+    await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
@@ -242,14 +242,14 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
-        await join_db.update_join(join.join_id, status=JoinStatusEnum.EDIT)
+        await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
         await deal_db.update_deal(deal.deal_id, chat_id=None, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo,
+                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, join_db: JoinRepo,
                                    commission_db: CommissionRepo, userbot: UserbotController, config: Config):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
@@ -261,7 +261,7 @@ async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, dea
     if customer_data['voted'] and executor_data['voted']:
         post = await post_db.get_post(deal.post_id)
         await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db, room_db,
-                                   commission_db, userbot, config)
+                                   commission_db, join_db, userbot, config)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')
