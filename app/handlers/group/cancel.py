@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import timedelta
 
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
@@ -8,15 +9,15 @@ from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputF
 from aiogram.utils.exceptions import ChatAdminRequired
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, JoinStatusEnum
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, JoinRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
 from app.keyboards.inline.deal import help_admin_kb
 from app.keyboards.inline.post import participate_kb
 from app.misc.media import make_post_media_template
-
+from app.misc.times import now
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ async def confirm_cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal
 
 async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.model,
                                  customer: UserRepo.model, state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                                 user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo,
+                                 user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
                                  userbot: UserbotController, config: Config,
                                  message: str = None, reset_state: bool = True):
     if deal.payed > 0:
@@ -130,10 +131,10 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
 
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
     room = await room_db.get_room(deal.chat_id)
-    for user_id in await userbot.get_chat_members(room.chat_id):
+    for user_id in [deal.customer_id, deal.executor_id, room.admin_id]:
         try:
             if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
-                await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
+                await bot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
             log.error(str(error) + f'\n{deal.deal_id=}')
     # if room.admin_id:
@@ -142,20 +143,21 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     #             await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
     #     except Exception as error:
     #         log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
-
     if deal.type == DealTypeEnum.PRIVATE:
         if deal.customer_id == post.user_id:
             await deal_db.update_deal(deal.deal_id, executor_id=None)
         else:
             await deal_db.update_deal(deal.deal_id, customer_id=None)
 
+    join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
+    await join_db.update_join(join.join_id, status=JoinStatusEnum.EDIT)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
 
 
 async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: PostRepo.model, customer: UserRepo.model,
                                executor: UserRepo.model,  state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                               user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo,
+                               user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
                                userbot: UserbotController, config: Config):
     await call.message.delete_reply_markup()
     if deal.price == 0:
@@ -221,7 +223,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await state.storage.reset_data(chat=call.message.chat.id, user=deal.executor_id)
 
         await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
-        for user_id in await userbot.get_chat_members(room.chat_id):
+        for user_id in [deal.customer_id, deal.executor_id, room.admin_id]:
             try:
                 if user_id not in (await userbot.get_client_user_id(), (await call.bot.me).id):
                     await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
@@ -239,6 +241,8 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             else:
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
+        join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
+        await join_db.update_join(join.join_id, status=JoinStatusEnum.EDIT)
         await deal_db.update_deal(deal.deal_id, chat_id=None, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
@@ -264,7 +268,7 @@ async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, dea
 
 
 async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                     post_db: PostRepo, state: FSMContext, room_db: RoomRepo,
+                                     post_db: PostRepo, state: FSMContext, room_db: RoomRepo, join_db: JoinRepo,
                                      commission_db: CommissionRepo, userbot: UserbotController, config: Config):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
@@ -277,7 +281,7 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
         post = await post_db.get_post(deal.post_id)
         await call.message.delete_reply_markup()
         await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                     commission_db, userbot, config)
+                                     commission_db, join_db, userbot, config)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')
@@ -285,7 +289,7 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
 
 async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: UserRepo,
                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
-                                  commission_db: CommissionRepo, config: Config):
+                                  commission_db: CommissionRepo, config: Config, join_db: JoinRepo):
     deal = await deal_db.get_deal_chat(msg.chat.id)
     if deal and deal.status != DealStatusEnum.DONE:
         customer = await user_db.get_user(deal.customer_id)
@@ -296,7 +300,7 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
                 f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
             )
             await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                         commission_db, userbot, config, message=text)
+                                         commission_db, join_db, userbot, config, message=text)
         else:
             room = await room_db.get_room(deal.chat_id)
             await room_db.update_room(room.chat_id, reason=f'{user} покинув чат')

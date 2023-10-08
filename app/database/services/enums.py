@@ -56,5 +56,6 @@ class JoinStatusEnum(Enum):
     EDIT = 'EDIT'
     ACTIVE = 'ACTIVE'
     DISABLE = 'DISABLE'
+    USED = 'USED'
 
 

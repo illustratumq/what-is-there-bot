@@ -66,6 +66,9 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
     post = await post_db.get_post(deal.post_id)
     post_msg = await msg.answer(post.construct_post_text(use_bot_link=False))
     join = await join_db.get_post_join(deal.customer_id, msg.from_user.id, post.post_id)
+    if join and join.status == JoinStatusEnum.EDIT:
+        await join_db.delete_join(join.join_id)
+        join = None
     delete = False
     one_time_join = False
     if not deal:

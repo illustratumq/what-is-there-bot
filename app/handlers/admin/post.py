@@ -100,6 +100,8 @@ async def approve_post_publish(call: CallbackQuery, callback_data: dict, post_db
                                user_db: UserRepo, config: Config):
     post_id = int(callback_data['post_id'])
     admin = await user_db.get_user(call.from_user.id)
+    if not admin:
+        await call.answer('Спочатку зареєструйтесь в боті (команда /start)', show_alert=True)
     post = await post_db.get_post(post_id)
     text = (
         f'{post.construct_post_text_shorted()}\n\n'

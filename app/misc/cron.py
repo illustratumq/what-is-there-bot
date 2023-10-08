@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, OrderStatusEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, MarkerRepo, SettingRepo, \
-    OrderRepo
+    OrderRepo, JoinRepo
 from app.fondy.api import FondyApiWrapper
 from app.handlers.admin.database import save_database, save_database_json
 from app.handlers.group.cancel import cancel_deal_processing
@@ -56,6 +56,10 @@ class database:
     @property
     def order_db(self):
         return OrderRepo(self.session)
+
+    @property
+    def join_db(self):
+        return JoinRepo(self.session)
 
     async def close(self):
         await self.session.commit()
@@ -104,7 +108,7 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                 )
                 bot.set_current(bot)
                 await cancel_deal_processing(bot, deal, post, customer, None, db.deal_db, db.post_db, db.user_db,
-                                             db.room_db, db.commission_db, userbot, config, message=message,
+                                             db.room_db, db.commission_db, db.join_db, userbot, config, message=message,
                                              reset_state=False)
 
 

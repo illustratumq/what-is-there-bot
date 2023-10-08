@@ -12,8 +12,11 @@ async def letters_cmd(msg: Message, letter_db: LetterRepo):
     await msg.delete()
     letters_new, letters_old = await letter_db.get_all_user_letters(msg.from_user.id)
     letters = letters_new + letters_old
-    await paginate_letters(msg, callback_data={'letter_id': letters[0].letter_id, 'action': 'pag'},
-                           letter_db=letter_db)
+    if not letters:
+        await msg.answer('У вас ще немає повідомлень')
+    else:
+        await paginate_letters(msg, callback_data={'letter_id': letters[0].letter_id, 'action': 'pag'},
+                               letter_db=letter_db)
 
 
 async def paginate_letters(upd: CallbackQuery | Message, callback_data: dict, letter_db: LetterRepo):

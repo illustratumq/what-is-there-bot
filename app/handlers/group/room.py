@@ -83,7 +83,7 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
         f'<b>Виконавець</b>: {executor.mention}\n\n'
-        f'<b>Встановленна ціна:</b> {deal.deal_priced}\n'
+        f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     await message.answer(f'{text}\nДля повторного виклику натисніть /menu',
