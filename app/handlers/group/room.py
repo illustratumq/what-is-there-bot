@@ -32,7 +32,7 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     if deal.customer_id in members and deal.executor_id in members:
         await deal_db.update_deal(
             deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
-        await full_room_action(cjr, deal, user_db, post_db, config)
+        await full_room_action(cjr, deal, user_db, post_db)
     else:
         await cjr.bot.send_message(
             cjr.chat.id, text='Зачекайте, доки приєднається інший користувач'
@@ -61,7 +61,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     await call.message.delete()
 
 
-async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo, config: Config):
+async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo):
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     post = await post_db.get_post(deal.post_id)
@@ -72,7 +72,7 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'Ціна угоди: {deal.deal_price}\n'
         f'🆔 #Угода_номер_{deal.deal_id}\n'
         f'ℹ Якщо Ви не знаєте правил нашого сервісу, то радимо ознайомитись '
-        f'з ними тут (посилання).\n\n'  # TODO: додати посилання на правила сервісу
+        f'з ними тут (посилання).\n\n'  #TODO: додати посилання на правила сервісу
         f'Для повторного виклику меню, скористайтесь командою /menu'
     )
     message = await cjr.bot.send_message(cjr.chat.id, text)
@@ -86,8 +86,10 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
-    await message.answer(f'{text}\nДля повторного виклику натисніть /menu',
-                         reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
+    media = all([bool(post.media_url), deal.no_media == False])
+    await message.answer(
+        text=f'{text}\nДля повторного виклику натисніть /menu', reply_markup=room_menu_kb(deal, media=media)
+    )
 
 
 async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
@@ -103,7 +105,10 @@ async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
         f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
-    await msg.answer(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
+    media = all([bool(post.media_url), deal.no_media == False])
+    await msg.answer(
+        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0)
+    )
 
 
 async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo,
@@ -121,7 +126,10 @@ async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: Pos
         f'<b>Встановленна ціна:</b> {deal.deal_price}\n'
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
-    await call.message.edit_text(text, reply_markup=room_menu_kb(deal, media=bool(post.media_url)))
+    media = all([bool(post.media_url), deal.no_media == False])
+    await call.message.edit_text(
+        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0)
+    )
 
 
 async def send_media_chat(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
@@ -163,6 +171,7 @@ async def call_admin_to_room_cmd(call: CallbackQuery, deal_db: DealRepo, room_db
             'Повідомлення про допомогу вже було відправлено адміністраторам сервісу. Зачекайте '
             'поки адміністратор приєднається в чат.'
         )
+        await call.answer()
         await call.message.answer(text)
         return
     await room_db.update_room(room.chat_id, reason='Виклик користувачем із чату', admin_required=True)
@@ -171,6 +180,7 @@ async def call_admin_to_room_cmd(call: CallbackQuery, deal_db: DealRepo, room_db
                                       reply_markup=await help_admin_kb(deal.deal_id))
     await room_db.update_room(room.chat_id, message_id=msg.message_id)
     await call.message.answer('Адміністратора було викликано у чат! Зачекайте, він невдовзі приєднається')
+    await call.answer()
 
 
 def setup(dp: Dispatcher):

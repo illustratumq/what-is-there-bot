@@ -20,6 +20,7 @@ async def moderate_main_page(call: CallbackQuery, callback_data: dict, post_db: 
     if post.status == DealStatusEnum.DONE:
         deal = await deal_db.get_deal_post(post_id)
         room = await room_db.get_room(deal.chat_id)
+        #TODO: не видаляти room_id якщо угода була завершена
         text += f'🆔 #Угода_номер_{deal.deal_id} завершилась в {room.construct_html_text(room.name)}'
     elif post.status == DealStatusEnum.BUSY:
         deal = await deal_db.get_deal_post(post_id)

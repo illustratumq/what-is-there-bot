@@ -5,17 +5,29 @@ room_cb = CallbackData('rm', 'deal_id', 'action')
 evaluate_cb = CallbackData('ev', 'deal_id', 'action', 'value')
 
 
-def room_menu_kb(deal: Deal, media: bool = False):
+def room_menu_kb(deal: Deal, media: bool = False, payed: bool = False):
 
     def button_cb(action: str):
         return dict(callback_data=room_cb.new(deal_id=deal.deal_id, action=action))
 
     inline_keyboard = [
-        [InlineKeyboardButton(Buttons.chat.pay, **button_cb('pay'))],
         [InlineKeyboardButton(Buttons.chat.edit_price, **button_cb('price'))],
-        [InlineKeyboardButton(Buttons.chat.end_deal, **button_cb('end_deal'))],
+    ]
+
+    if payed:
+        close_deal_button = [
+            InlineKeyboardButton(Buttons.chat.end_deal, **button_cb('end_deal')),
+            # InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))
+        ]
+    else:
+        inline_keyboard.insert(0, [InlineKeyboardButton(Buttons.chat.pay, **button_cb('pay'))])
+        close_deal_button = [InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))]
+
+    inline_keyboard += [
+        close_deal_button,
         [InlineKeyboardButton(Buttons.chat.admin, **button_cb('help'))]
     ]
+
     if media:
         inline_keyboard.append(
             [InlineKeyboardButton(Buttons.chat.media, **button_cb('send_media'))]
@@ -23,6 +35,12 @@ def room_menu_kb(deal: Deal, media: bool = False):
 
     return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)
 
+def room_pay_kb(deal: Deal):
+
+    def button_cb(action: str):
+        return dict(callback_data=room_cb.new(deal_id=deal.deal_id, action=action))
+
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(Buttons.chat.pay, **button_cb('pay'))]])
 
 def close_deal_kb(deal: Deal):
 

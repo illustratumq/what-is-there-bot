@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.deep_linking import get_start_link
 
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo
-from app.keyboards.inline.chat import room_cb, back_chat_kb
+from app.keyboards.inline.chat import room_cb, back_chat_kb, room_pay_kb
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import pay_deal_kb
 
@@ -59,7 +59,7 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
         else:
             user = await user_db.get_user(deal.executor_id)
         await msg.answer(f'{user.mention}, відправте таке ж саме число, '
-                         f'щоб підтвердити зміну ціни.', reply_markup=back_chat_kb(deal))
+                         f'щоб підтвердити зміну ціни.')
     elif customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
         customer = await user_db.get_user(deal.customer_id)
         await apply_new_price(msg, deal_db, deal, state, customer, new_price)
@@ -73,22 +73,25 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
     text = (
         f'🔔 Ціна угоди була успішно змінена на {price} грн.\n\n'
     )
+    reply_markup = None
     if deal.payed == 0:
         text += (
-            'Якщо все готово, переходьте до оплати угоди /menu'
+            'Якщо все готово, переходьте до оплати угоди'
         )
+        reply_markup = room_pay_kb(deal)
     else:
         if price > deal.payed:
             text += (
                 f'Тепер {customer.create_html_link("Замовник")} повинен доплатити '
                 f'різницю у розмірі {price-deal.payed} грн.'
             )
+            reply_markup = room_pay_kb(deal)
         else:
             text += (
                 f'Різниця у розмірі {price - deal.payed} грн. буде нарахована {customer.create_html_link("Замовнику")} '
                 f'на баланс.'
             )
-    await msg.answer(text)
+    await msg.answer(text, reply_markup=reply_markup)
     await deal_db.update_deal(deal.deal_id, price=price)
     await state.storage.reset_data(chat=msg.chat.id, user=deal.executor_id)
     await state.storage.reset_data(chat=msg.chat.id, user=deal.customer_id)

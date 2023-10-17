@@ -60,11 +60,9 @@ async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo, post_db: PostRepo,
                           join_db: JoinRepo, state: FSMContext):
     await msg.delete()
-    user = await user_db.get_user(msg.from_user.id)
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
-    post_msg = await msg.answer(post.construct_post_text(use_bot_link=False))
     join = await join_db.get_post_join(deal.customer_id, msg.from_user.id, post.post_id)
     if join and join.status == JoinStatusEnum.USED:
         await join_db.delete_join(join.join_id)
@@ -122,7 +120,7 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
         join = await join_db.add(deal_id=deal_id, post_id=post.post_id, customer_id=post.user_id,
                                  executor_id=msg.from_user.id, one_time_join=one_time_join)
     join_msg = await msg.answer(text, reply_markup=send_deal_kb(join, delete))
-    await join_db.update_join(join.join_id, post_msg_id=post_msg.message_id, join_msg_id=join_msg.message_id)
+    await join_db.update_join(join.join_id, join_msg_id=join_msg.message_id)
     await ParticipateSG.Comment.set()
     await state.update_data(join_id=join.join_id)
 

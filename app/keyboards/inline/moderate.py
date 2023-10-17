@@ -64,29 +64,12 @@ def confirm_post_moderate(action: str, post: Post, admin: User):
         ]
     )
 
-def comment_deal_kb(deals: list[Deal], deal_id: int, sort: str = 'default'):
-    deals = [deal.deal_id for deal in deals]
-    current_index = deals.index(deal_id)
-    next_deal_id = deals[(current_index + 1) % len(deals)]
-    prev_deal_id = deals[(current_index - 1) % len(deals)]
+def comment_deals_kb():
 
-    def button_cb(current_deal_id: int, action: str):
-        return dict(
-            callback_data=comment_deal_cb.new(deal_id=current_deal_id, action=action, sort=sort)
-        )
-
-    sort_type_text = {
-        'default': 'Вимк', 'max': 'Найкращі', 'min': 'Найгірші'
-    }
-
-    inline_keyboard = [
-        [InlineKeyboardButton(Buttons.deal.sort.format(sort_type_text[sort]),
-                              **button_cb(deal_id, action='sort_switch'))],
-        [
-            InlineKeyboardButton('◀', **button_cb(prev_deal_id, 'pag')),
-            InlineKeyboardButton('Назад', **button_cb(deal_id, 'cancel')),
-            InlineKeyboardButton('▶', **button_cb(next_deal_id, 'pag'))
+    return InlineKeyboardMarkup(
+        row_width=1,
+        inline_keyboard=[
+            [InlineKeyboardButton(Buttons.menu.about, callback_data='edit_about')],
+            [InlineKeyboardButton(Buttons.menu.comment, switch_inline_query_current_chat='Відгуки')]
         ]
-    ]
-
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+    )

@@ -76,10 +76,10 @@ def setup_cron_function(scheduler: ContextSchedulerDecorator):
     # scheduler.add_job(
     #     func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
     # )
-    scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
-    scheduler.add_job(
-       func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
-    )
+    # scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
+    # scheduler.add_job(
+    #    func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
+    # )
     log.info('Функції додані в cron...')
 
 
@@ -116,8 +116,7 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
     db = database(session)
     for order in await db.order_db.get_orders_status(OrderStatusEnum.PROCESSING):
         response = (await fondy.check_order(order))['response']
-        deal = await db.deal_db.get_deal(order.deal_id)
-        await bot.send_message(deal.chat_id, response)
+        # deal = await db.deal_db.get_deal(order.deal_id)
         if response['order_status'] == 'approved':
             # deal = await db.deal_db.get_deal(order.deal_id)
             # answer = await fondy.make_capture(order, deal.price)

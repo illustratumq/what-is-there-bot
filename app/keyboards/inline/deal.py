@@ -14,8 +14,8 @@ def send_deal_kb(join: Join, delete: bool = False, ban: bool = False):
         return dict(callback_data=deal_cb.new(join_id=join.join_id if join else 'None', action=action))
 
     inline_keyboard = [
-        [InlineKeyboardButton(Buttons.post.send_deal, **button_cb('send')),
-         InlineKeyboardButton(Buttons.post.cancel, **button_cb('close'))]
+        [InlineKeyboardButton(Buttons.post.send_deal, **button_cb('send'))],
+        [InlineKeyboardButton(Buttons.post.cancel, **button_cb('close'))]
     ]
 
     if ban:
@@ -39,16 +39,16 @@ def moderate_deal_kb(join: Join, is_comment_deals: list):
 
     if is_comment_deals:
 
-        def button_c_cb(action: str):
-            return dict(
-                callback_data=comment_cb.new(original_id=join.deal_id, executor_id=join.executor_id, action=action,
-                                             deal_id=join.deal_id, sort='None'))
-
         inline_keyboard.insert(0, [
-            InlineKeyboardButton(Buttons.deal.read_comments, **button_c_cb('start'))
+            InlineKeyboardButton(Buttons.deal.read_comments, **button_cb('read_comments'))
         ])
 
     return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)
+
+def executor_comments_kb(executor_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(Buttons.deal.read, switch_inline_query_current_chat=f'відгуки@{executor_id}')]
+    ])
 
 
 def pagination_deal_kb(executor_id: int, deals_id: list[int], current_deal_id: int, original_id: int, sort: str = 'None'):

@@ -53,7 +53,8 @@ async def main():
     allowed_updates = (
             AllowedUpdates.MESSAGE + AllowedUpdates.CALLBACK_QUERY +
             AllowedUpdates.EDITED_MESSAGE + AllowedUpdates.CHAT_JOIN_REQUEST +
-            AllowedUpdates.PRE_CHECKOUT_QUERY + AllowedUpdates.SHIPPING_QUERY
+            AllowedUpdates.PRE_CHECKOUT_QUERY + AllowedUpdates.SHIPPING_QUERY +
+            AllowedUpdates.INLINE_QUERY
     )
 
     environments = dict(config=config, dp=dp, scheduler=scheduler, userbot=userbot, fondy=fondy)
@@ -63,7 +64,7 @@ async def main():
 
     await set_bot_commands(bot)
     await setup_default_commission_pack(sqlalchemy_session)
-    # await notify_admin(bot, config.bot.admin_ids)
+    await notify_admin(bot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
 
     try:

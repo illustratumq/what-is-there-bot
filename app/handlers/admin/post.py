@@ -11,6 +11,7 @@ from app.database.models import Post
 from app.database.services.enums import DealStatusEnum
 from app.database.services.repos import PostRepo, UserRepo, DealRepo, MarkerRepo, LetterRepo
 from app.filters import IsAdminFilter
+from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.moderate import confirm_post_moderate, moderate_post_kb, moderate_post_cb, \
     after_public_edit_kb, public_all_post_cb, public_post_cb
 from app.keyboards.inline.post import participate_kb
@@ -201,9 +202,11 @@ async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, mar
             reply_markup=reply_markup, disable_web_page_preview=True if not post.media_id else False
         )
         await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
-        await bot.send_message(post.user_id, text=f'Ваш пост опубліковано {hide_link(message.url)}')
+        text = f'Ваш пост <b>{post.title}</b> було опубліковано'
+        await bot.send_message(post.user_id, text=text, disable_web_page_preview=True,
+                               reply_markup=to_bot_kb(post.post_url, text='Перейти до посту'))
         await letter_db.add(
-            text=f'Ваш {post.construct_html_link("пост")} було опубліковано',
+            text=text,
             user_id=post.user_id, post_id=post.post_id
         )
         await markers_post_processing(marker_db, post, bot, message.url, user_db)
@@ -214,12 +217,17 @@ async def markers_post_processing(marker_db: MarkerRepo, post: Post, bot: Bot, u
     for marker in markers:
         try:
             user = await user_db.get_user(marker.user_id)
-            start = int(user.time.split('-')[0])
-            end = int(user.time.split('-')[1])
-            if start < int(now().strftime('%H')) <= end:
+            is_on_time = True
+            if user.time != '*':
+                start = int(user.time.split('-')[0])
+                end = int(user.time.split('-')[1])
+                is_on_time = start < int(now().strftime('%H')) <= end
+
+            if is_on_time and post.user_id != marker.user_id:
                 await bot.send_message(
                     marker.user_id,
-                    text=f'На каналі з\'явився пост по вашій підписці "{marker.text}"{hide_link(url)}'
+                    text=f'На каналі опублікований пост <b>"{post.title}"</b> по одній з ваших підписок',
+                    reply_markup=to_bot_kb(text='Перейти до посту', url=post.post_url)
                 )
         except:
             pass

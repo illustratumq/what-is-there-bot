@@ -1,32 +1,40 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import Message, ChatType, CallbackQuery
-from aiogram.utils.markdown import hide_link
+from aiogram.types import Message, ChatType, InlineQuery, InlineQueryResultArticle, InputTextMessageContent, \
+    CallbackQuery
 
-from app.database.services.enums import DealStatusEnum
-from app.database.services.repos import UserRepo, DealRepo, PostRepo
+from app.config import Config
+from app.database.services.repos import UserRepo, DealRepo
 from app.keyboards import Buttons
-from app.keyboards.inline.moderate import comment_deal_kb, comment_deal_cb
+from app.keyboards.inline.moderate import comment_deals_kb
 from app.keyboards.reply.menu import basic_kb
 from app.states.states import UserAboutSG
-
+from app.handlers.private.participate import is_valid_comment
 
 async def my_rating_cmd(msg: Message, user_db: UserRepo, deal_db: DealRepo):
     user = await user_db.get_user(msg.chat.id)
     await msg.answer(await user.construct_my_rating(deal_db),
-                     reply_markup=basic_kb(([Buttons.menu.about, Buttons.menu.comment], [Buttons.menu.back])))
+                     reply_markup=comment_deals_kb())
 
-
-async def add_user_about(msg: Message):
+async def add_user_about(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
     text = (
         'Будь ласка напишіть короткий опис про себе (до 500 символів)'
     )
-    await msg.answer(text, reply_markup=basic_kb([Buttons.menu.to_rating]))
+    last_msg = await call.message.answer(text, reply_markup=basic_kb([Buttons.menu.back]))
+    await state.update_data(last_msg_id=last_msg.message_id)
     await UserAboutSG.Input.set()
 
 
-async def save_user_about(msg: Message, user_db: UserRepo, deal_db: DealRepo):
+async def save_user_about(msg: Message, user_db: UserRepo, deal_db: DealRepo, state: FSMContext, config: Config):
+    data = await state.get_data()
+    if 'last_msg_id' in data.keys():
+        try:
+            await msg.bot.delete_message(msg.from_user.id, data['last_msg_id'])
+        except:
+            pass
+    await msg.delete()
     user_about = msg.html_text
     if len(user_about) > 500:
         error_text = (
@@ -34,85 +42,54 @@ async def save_user_about(msg: Message, user_db: UserRepo, deal_db: DealRepo):
         )
         await msg.answer(error_text)
         return
+    valid_about = is_valid_comment(user_about)['status']
+    if valid_about == 'not valid':
+        await msg.answer('Твій опис було  відхилено. Оскільки він містить заборонені посилання або теги. '
+                         'Ти можеш написати його знову.')
+        return
+    elif valid_about == 'suspiciously':
+        warning = (
+            f'🔴 #ПідозрілийВислів\n\n'
+            f'Користувач {msg.from_user.get_mention()} ({msg.from_user.id}) '
+            f'використав підозрілий вираз в своєму описі\n\n'
+            f'<i>{msg.text}</i>'
+        )
+        await msg.bot.send_message(
+            config.misc.admin_channel_id, warning)
     await user_db.update_user(msg.from_user.id, description=user_about)
     await my_rating_cmd(msg, user_db, deal_db)
 
-async def preview_my_comments_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo, user_db: UserRepo):
-    deals = await deal_db.get_deal_executor(executor_id=msg.from_user.id, status=DealStatusEnum.DONE)
+
+async def user_comments_list(query: InlineQuery, deal_db: DealRepo, user_db: UserRepo):
+    results = []
+    deals = await deal_db.get_comment_deals(query.from_user.id)
     if not deals:
-        await msg.answer('Про вас ще немає відгуків. Зверніть увагу, відгук можна залишиити лише про виконавця.')
-        return
-    await msg.delete()
-    deal_id = deals[0].deal_id
-    deal = await deal_db.get_deal(deal_id)
-    post = await post_db.get_post(deal.post_id)
-    customer = await user_db.get_user(msg.from_user.id)
-    text = (
-        f'Угода: {post.title} {hide_link(post.post_url)}\n\n'
-        f'Оцінка: {customer.emojize_rating_text(deal.rating)} ({deal.rating}/5)\n\n'
-        f'💬 {customer.full_name}: <i>{deal.comment}</i>\n\n'
-        f'Відгук {deals.index(deal) + 1} з {len(deals)}'
-    )
-    await msg.answer(text, reply_markup=comment_deal_kb(deals, deal_id))
-
-
-async def view_my_comments_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                               user_db: UserRepo):
-    if callback_data['action'] == 'cancel':
-        await call.message.delete()
-        await my_rating_cmd(call.message, user_db, deal_db)
-        return
-
-    customer = await user_db.get_user(call.from_user.id)
-    deals = await deal_db.get_deal_executor(executor_id=call.from_user.id, status=DealStatusEnum.DONE)
-
-    if len(deals) == 1:
-        await call.answer('У вас тільки один відгук', show_alert=True)
-        return
-
-    if 'deal_id' in callback_data.keys():
-        deal_id = int(callback_data['deal_id'])
+        results.append(
+            InlineQueryResultArticle(
+                id='unknown',
+                title=f'Відгуки про тебе не знайдені',
+                input_message_content=InputTextMessageContent('Нажаль у цього виконавця ще немає відгуків'),
+            )
+        )
     else:
-        deal_id = deals[0].deal_id
-        callback_data.update(sort='default')
+        for deal in deals:
+            customer = await user_db.get_user(deal.customer_id)
+            comment = f' {deal.comment}' if deal.comment else 'Без коментаря'
+            results.append(
+                InlineQueryResultArticle(
+                    id=deal.deal_id,
+                    title=f'{customer.emojize_rating_text(deal.rating)} від {customer.full_name}',
+                    description=f'{deal.updated_at.strftime("%d.%m.%Y")} {comment}',
+                    input_message_content=InputTextMessageContent(comment),
+                )
+            )
 
-    sort_switch = callback_data['action'] == 'sort_switch'
-    if sort_switch:
-        modes = ['default', 'max', 'min']
-        callback_data.update(sort=modes[(modes.index(callback_data['sort']) + 1) % 3])
-
-    if callback_data['sort'] == 'max':
-        deals.sort(key=lambda d: d.rating, reverse=True)
-        if sort_switch:
-            deal_id = deals[0].deal_id
-    elif callback_data['sort'] == 'min':
-        deals.sort(key=lambda d: d.rating, reverse=False)
-        if sort_switch:
-            deal_id = deals[0].deal_id
-    else:
-        deals.sort(key=lambda d: d.updated_at)
-        if sort_switch:
-            deal_id = deals[0].deal_id
-
-    deal = await deal_db.get_deal(deal_id)
-    post = await post_db.get_post(deal.post_id)
-
-    text = (
-        f'Угода: {post.title} {hide_link(post.post_url)}\n\n'
-        f'Оцінка: {customer.emojize_rating_text(deal.rating)} ({deal.rating}/5)\n\n'
-        f'💬 {customer.full_name}: <i>{deal.comment}</i>\n\n'
-        f'Відгук {deals.index(deal) + 1} з {len(deals)}'
-    )
-    await call.message.edit_text(text, reply_markup=comment_deal_kb(deals, deal_id, callback_data['sort']))
+    await query.answer(results, is_personal=True, cache_time=5)
 
 
 def setup(dp: Dispatcher):
-    dp.register_message_handler(my_rating_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.to_rating, state='*')
-    dp.register_message_handler(my_rating_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.my_rating, state='*')
-    dp.register_message_handler(add_user_about, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.about, state='*')
+    dp.register_inline_handler(user_comments_list, text='Відгуки', state='*')
+    dp.register_callback_query_handler(add_user_about, text='edit_about', state='*')
+    dp.register_message_handler(my_rating_cmd, ChatTypeFilter(ChatType.PRIVATE),
+                                text=Buttons.menu.my_rating, state='*')
     dp.register_message_handler(save_user_about, ChatTypeFilter(ChatType.PRIVATE), state=UserAboutSG.Input)
-
-    dp.register_message_handler(preview_my_comments_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.comment,
-                                state='*')
-    dp.register_callback_query_handler(view_my_comments_cmd, ChatTypeFilter(ChatType.PRIVATE),
-                                       comment_deal_cb.filter(), state='*')

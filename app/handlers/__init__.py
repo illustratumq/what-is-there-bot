@@ -13,5 +13,5 @@ def setup(dp: Dispatcher):
     admin.setup(dp)
     private.setup(dp)
     group.setup(dp)
-    non_state_message.setup(dp)
+    # non_state_message.setup(dp)
     log.info('Хендлери встановлені...')

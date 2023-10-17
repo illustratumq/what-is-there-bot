@@ -28,10 +28,8 @@ async def moderate_markers_cmd(msg: Message, marker_db: MarkerRepo):
     )
     markers = await marker_db.get_markers_user(msg.from_user.id)
     if markers:
-        markers_html = ',\n'.join([f'<code>{m.text}</code>' for m in markers])
+        markers_html = ', '.join([f'<code>{m.text}</code>' for m in markers])
         text += f' 📚 Ваші підписки:\n\n{markers_html}'
-    else:
-        text += 'У вас немає підписок :('
     await msg.answer(text, reply_markup=basic_kb(([Buttons.menu.new_marker, Buttons.menu.del_marker],
                                                   [Buttons.menu.to_markers])))
 
@@ -54,7 +52,7 @@ async def save_marker_cmd(msg: Message, marker_db: MarkerRepo, state: FSMContext
         await marker_db.add(user_id=msg.from_user.id, text=marker_text)
         reply_markup = basic_kb(([Buttons.menu.new_marker, Buttons.menu.del_marker],
                                  [Buttons.menu.to_markers]))
-        await msg.answer(f'Підписка <code>{marker_text}</code> успішно додана', reply_markup=reply_markup)
+        # await msg.answer(f'Підписка <code>{marker_text}</code> успішно додана', reply_markup=reply_markup)
         await moderate_markers_cmd(msg, marker_db)
         await state.finish()
 

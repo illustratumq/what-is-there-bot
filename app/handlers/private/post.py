@@ -174,7 +174,7 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
         await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
         message = await msg.bot.send_message(
             config.misc.reserv_channel_id, post.construct_post_text(),
-            reply_markup=participate_kb(await post.construct_participate_link()),
+            reply_markup=participate_kb(await post.participate_link),
             disable_web_page_preview=True if not post.media_id else False
         )
         await post_db.update_post(post.post_id, reserv_message_id=message.message_id)

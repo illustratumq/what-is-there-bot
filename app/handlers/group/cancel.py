@@ -23,7 +23,6 @@ log = logging.getLogger(__name__)
 
 
 async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo):
-    await call.message.delete()
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     text = (
@@ -31,7 +30,7 @@ async def cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
         '<b>Завершити</b> - угода завершується та сплачені кошти нараховуються виконавцю.\n\n'
         '<b>Відмінити</b> - угода відміняється та сплачені кошти повертаються на баланс замовника.'
     )
-    await call.message.answer(
+    await call.message.edit_text(
         text, reply_markup=close_deal_kb(deal)
     )
 
