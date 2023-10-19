@@ -86,7 +86,6 @@ def setup_cron_function(scheduler: ContextSchedulerDecorator):
 async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: UserbotController, config: Config):
     db = database(session)
     for deal in await db.deal_db.get_deal_status(DealStatusEnum.BUSY):
-        print(localize(deal.next_activity_date), localize(deal.next_activity_date) <= now())
         if deal.payed == 0 and deal.next_activity_date and localize(deal.next_activity_date) <= now():
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)

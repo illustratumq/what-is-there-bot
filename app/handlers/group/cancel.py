@@ -1,12 +1,10 @@
 import logging
 import os
-from datetime import timedelta
 
 from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputFile
-from aiogram.utils.exceptions import ChatAdminRequired
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, JoinStatusEnum
@@ -17,7 +15,6 @@ from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evalua
 from app.keyboards.inline.deal import help_admin_kb
 from app.keyboards.inline.post import participate_kb
 from app.misc.media import make_post_media_template
-from app.misc.times import now
 
 log = logging.getLogger(__name__)
 
@@ -132,8 +129,9 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     room = await room_db.get_room(deal.chat_id)
     for user_id in [deal.customer_id, deal.executor_id, room.admin_id]:
         try:
-            if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
-                await bot.kick_chat_member(room.chat_id, user_id)
+            if user_id:
+                if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
+                    await bot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
             log.error(str(error) + f'\n{deal.deal_id=}')
     # if room.admin_id:
@@ -181,18 +179,22 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
     else:
         executor_commission = await commission_db.get_commission(executor.commission_id)
         customer_commission = await commission_db.get_commission(customer.commission_id)
-        commission = executor_commission.calculate_commission(deal.price)
-        balance = executor.balance + deal.price - commission
-        full_commission = customer_commission.calculate_commission(deal.price) + commission
-        await user_db.update_user(executor.user_id, balance=balance)
+        commission_for_executor = executor_commission.calculate_commission(deal.price)
+        balance_for_executor = executor.balance + deal.price - commission_for_executor
+        full_commission = customer_commission.calculate_commission(deal.price) + commission_for_executor
+        await user_db.update_user(executor.user_id, balance=balance_for_executor)
         text = (
-            f'На ваш рахунок зараховано {deal.price-commission} грн. Комісія становить {commission} грн. '
+            f'На ваш рахунок зараховано {deal.price-commission_for_executor} грн. '
+            f'Комісія становить {commission_for_executor} грн. '
             f'Ви можете вивести ці кошти на банківську карту, або використати для оплати іншої угоди.\n\n'
             f'Дякуємо за використання нашого сервісу.'
         )
         await call.bot.send_message(deal.executor_id, text)
         if deal.payed > deal.price:
             back_to_customer = deal.payed - deal.price
+            commission_payed = customer_commission.calculate_commission(deal.payed)
+            commission_price = customer_commission.calculate_commission(deal.price)
+            back_to_customer += (commission_payed - commission_price)
             customer_balance = customer.balance + back_to_customer
             await user_db.update_user(customer.user_id, balance=customer_balance)
             text = (
@@ -224,8 +226,9 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.DONE)
         for user_id in [deal.customer_id, deal.executor_id, room.admin_id]:
             try:
-                if user_id not in (await userbot.get_client_user_id(), (await call.bot.me).id):
-                    await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
+                if user_id:
+                    if user_id not in (await userbot.get_client_user_id(), (await call.bot.me).id):
+                        await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
             except Exception as error:
                 log.error(str(error) + f'\n{deal.deal_id=}')
         # if room.admin_id:

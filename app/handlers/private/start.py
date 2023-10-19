@@ -8,8 +8,9 @@ from aiogram.types import Message, ChatType
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, UserTypeEnum, JoinStatusEnum
-from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo, CommissionRepo
 from app.filters import IsAdminFilter
+from app.handlers.group.price import pay_method_choose
 from app.handlers.private.room import get_room
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
@@ -22,6 +23,8 @@ PARTICIPATE_REGEX = re.compile(r'participate-(\d+)')
 ADMIN_HELP_REGEX = re.compile(r'helpdeal-(\d+)')
 MANAGE_POST_REGEX = re.compile(r'manage_post-(\d+)')
 PRIVATE_DEAL_REGEX = re.compile(r'private_deal-(\d+)')
+PAY_DEAL_REGEX = re.compile(r'pay_deal-(\d+)')
+
 
 greeting_text = (
     'Цей бот дозволяє вам публікувати та керувати постами на каналі ENTER\n\n'
@@ -207,6 +210,20 @@ async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: D
         chat=room_chat_id, user=deal.customer_id, last_msg_id=customer_msg.message_id)
 
 
+async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo,
+                                 commission_db: CommissionRepo, post_db: PostRepo):
+    await msg.delete()
+    deal_id = int(deep_link.groups()[-1])
+    deal = await deal_db.get_deal(deal_id)
+    post = await post_db.get_post(deal.post_id)
+    customer = await user_db.get_user(deal.customer_id)
+
+    if msg.from_user.id != customer.user_id:
+        await msg.answer('Ви не є замовником цього завдання')
+        return
+
+    await pay_method_choose(msg, deal, customer, post, commission_db)
+
 def setup(dp: Dispatcher):
     dp.register_message_handler(
         participate_cmd, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PARTICIPATE_REGEX), state='*')
@@ -214,6 +231,9 @@ def setup(dp: Dispatcher):
         admin_help_cmd, IsAdminFilter(), ChatTypeFilter(ChatType.PRIVATE), CommandStart(ADMIN_HELP_REGEX), state='*')
     dp.register_message_handler(
         manage_post_cmd, IsAdminFilter(), ChatTypeFilter(ChatType.PRIVATE), CommandStart(MANAGE_POST_REGEX), state='*')
+    dp.register_message_handler(
+        pay_deal_customer_chat, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PAY_DEAL_REGEX), state='*'
+    )
     dp.register_message_handler(
         confirm_private_deal_cmd, ChatTypeFilter(ChatType.PRIVATE), CommandStart(PRIVATE_DEAL_REGEX), state='*')
     dp.register_message_handler(cancel_action_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.action.cancel,

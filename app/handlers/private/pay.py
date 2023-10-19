@@ -6,6 +6,7 @@ from aiogram.utils.markdown import hide_link
 from app.database.services.enums import OrderStatusEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, CommissionRepo, OrderRepo
 from app.fondy.api import FondyApiWrapper
+from app.handlers.group.price import pay_method_choose
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import confirm_pay_kb, pay_cb, pay_deal_kb
 
@@ -110,35 +111,7 @@ async def back_to_pay_method(call: CallbackQuery, callback_data: dict, deal_db: 
     customer = await user_db.get_user(deal.customer_id)
     post = await post_db.get_post(deal.post_id)
     await call.message.delete()
-    need_to_pay = deal.price - deal.payed
-    commission_package = await commission_db.get_commission(customer.commission_id)
-    commission = commission_package.deal_commission(deal)
-    text = (
-        f'Ви бажаєте оплатити угоду "{post.title}".\n\n'
-        f'Встановлена ціна {deal.price} грн., з неї сплачено {deal.payed} грн.\n'
-        f'👉 Необхідно сплатити {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
-    )
-    if customer.balance > 0 and customer.balance >= need_to_pay + commission:
-        text += (
-            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
-            f'Або оплатити всю суму угоди окремим платежем.\n\nБудь-ласка оберіть метод оплати.'
-        )
-        reply_markup = pay_deal_kb(deal, balance=True)
-    elif 0 < customer.balance < need_to_pay + commission:
-        text += (
-            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
-            f'та оплатити решту у розмірі {need_to_pay + commission - customer.balance} грн. '
-            f'Або ж оплатити всю суму угоди окремим платежем.\n\n'
-            f'Будь-ласка оберіть метод оплати.'
-        )
-        reply_markup = pay_deal_kb(deal, partially=True)
-    else:
-        text += (
-            f'Будь-ласка сплатіть угоду, натиснувши кнопку нижче.'
-        )
-        reply_markup = pay_deal_kb(deal)
-
-    await call.message.answer(text, reply_markup=reply_markup)
+    await pay_method_choose(call.message, deal, customer, post, commission_db)
 
 
 def setup(dp: Dispatcher):

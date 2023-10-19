@@ -111,7 +111,7 @@ def join_room_kb(invite_link: str):
     )
 
 
-def to_bot_kb(url: str, text: str = 'Перейти до оплати'):
+def to_bot_kb(url: str, text: str = Buttons.chat.pay):
     return InlineKeyboardMarkup(
         row_width=1,
         inline_keyboard=[

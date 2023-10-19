@@ -25,8 +25,8 @@ async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: Deal
     executor = await user_db.get_user(deal.executor_id)
     commission = await commission_db.get_commission(customer.commission_id)
     text = (
-        f'Щоб встановити ціну угоди, {executor.create_html_link("Виконавець")} та '
-        f'{customer.create_html_link("Замовник")} повинні відправити одне й те саме ціле число. '
+        f'Щоб встановити ціну угоди, {customer.create_html_link(customer.full_name)} та '
+        f'{executor.create_html_link(executor.full_name)} повинні відправити одне й те саме ціле число. '
         f'Мінімальна ціна — {commission.minimal} грн.\n\n'
         f'ℹ В нашому сервісі встановлена комісія, з якою Ви можете ознайомитись за посиланням.'
     )
@@ -78,18 +78,18 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
         text += (
             'Якщо все готово, переходьте до оплати угоди'
         )
-        reply_markup = room_pay_kb(deal)
+        reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
     else:
         if price > deal.payed:
             text += (
-                f'Тепер {customer.create_html_link("Замовник")} повинен доплатити '
+                f'Тепер {customer.create_html_link(customer.full_name)} повинен доплатити '
                 f'різницю у розмірі {price-deal.payed} грн.'
             )
             reply_markup = room_pay_kb(deal)
         else:
             text += (
-                f'Різниця у розмірі {price - deal.payed} грн. буде нарахована {customer.create_html_link("Замовнику")} '
-                f'на баланс.'
+                f'Різниця у розмірі {price - deal.payed} грн. буде нарахована '
+                f'{customer.create_html_link(customer.full_name)} на баланс.'
             )
     await msg.answer(text, reply_markup=reply_markup)
     await deal_db.update_deal(deal.deal_id, price=price)
@@ -97,8 +97,7 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
     await state.storage.reset_data(chat=msg.chat.id, user=deal.customer_id)
 
 
-async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                       post_db: PostRepo, commission_db: CommissionRepo):
+async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     if call.from_user.id == deal.executor_id:
@@ -117,33 +116,45 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
     await call.answer()
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
-    post = await post_db.get_post(deal.post_id)
     text = (
-        f'{customer.create_html_link("Замовник")} оплачує угоду в особистому чаті з ботом.\n\n'
-        f'{executor.create_html_link("Виконавець")} не приступайте до роботи, поки не побачите повідомлення від '
+        f'{customer.create_html_link(customer.full_name)} оплачує угоду в особистому чаті з ботом.\n\n'
+        f'{executor.create_html_link(executor.full_name)} не приступайте до роботи, поки не побачите повідомлення від '
         f'бота про успішну оплату угоди.'
     )
     await call.message.delete()
-    await call.bot.send_message(deal.chat_id, text, reply_markup=to_bot_kb(await get_start_link('')))
+    await call.bot.send_message(deal.chat_id, text,
+                                reply_markup=to_bot_kb(await get_start_link(f'pay_deal-{deal.deal_id}')))
 
+
+async def pay_method_choose(msg: Message, deal: DealRepo.model, customer: UserRepo.model, post: PostRepo.model,
+                            commission_db: CommissionRepo):
     need_to_pay = deal.price - deal.payed
     commission_package = await commission_db.get_commission(customer.commission_id)
     commission = commission_package.deal_commission(deal)
 
     text = (
-        f'Ви бажаєте оплатити угоду "{post.title}".\n\n'
-        f'Встановлена ціна {deal.price} грн., з неї сплачено {deal.payed} грн.\n'
-        f'👉 Необхідно сплатити {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
+        f'Ви бажаєте оплатити угоду <b>"{post.title}"</b>.\n\n'
+        f'<b>Встановлена ціна:</b> {deal.price} грн.\n'
     )
+
+    if deal.payed > 0:
+        text += (
+            f'<b>Сплачено:</b> {deal.payed} грн.\n'
+        )
+
+    text += (
+        f'<b>Необхідно сплатити:</b> {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
+    )
+
     if customer.balance > 0 and customer.balance >= need_to_pay + commission:
         text += (
-            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
+            f'ℹ️ На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
             f'Або оплатити всю суму угоди окремим платежем.\n\nБудь-ласка оберіть метод оплати.'
         )
         reply_markup = pay_deal_kb(deal, balance=True)
     elif 0 < customer.balance < need_to_pay + commission:
         text += (
-            f'➡️ На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
+            f'ℹ️️ На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
             f'та оплатити решту у розмірі {need_to_pay + commission - customer.balance} грн. '
             f'Або ж оплатити всю суму угоди окремим платежем.\n\n'
             f'Будь-ласка оберіть метод оплати.'
@@ -155,8 +166,7 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
         )
         reply_markup = pay_deal_kb(deal)
 
-    await call.bot.send_message(deal.customer_id, text, reply_markup=reply_markup)
-
+    await msg.answer(text, reply_markup=reply_markup)
 
 def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
