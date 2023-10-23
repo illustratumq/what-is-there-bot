@@ -163,6 +163,7 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
                              media_url=data['media_url'], user_id=msg.from_user.id,)
     deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
                              no_media=data['no_media'])
+    await deal.create_log(deal_db, f'Угода створена з постом #{post.post_id}')
 
     if setting.need_check_post or await need_check_post_filter(user, post, deal_db):
         message = await msg.bot.send_message(config.misc.admin_channel_id,

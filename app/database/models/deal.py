@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import ENUM, ARRAY
 
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import DealStatusEnum, DealTypeEnum
+from app.misc.times import now
 
 
 class Deal(TimedBaseModel):
@@ -23,6 +24,7 @@ class Deal(TimedBaseModel):
     no_media = sa.Column(sa.BOOLEAN, default=False, nullable=False)
     next_activity_date = sa.Column(sa.DateTime, nullable=True)
     activity_confirm = sa.Column(sa.BOOLEAN, default=True, nullable=False)
+    log = sa.Column(sa.VARCHAR, nullable=True)
 
     @property
     def participants(self):
@@ -38,3 +40,8 @@ class Deal(TimedBaseModel):
             return 'Оплачена'
         else:
             return 'Неоплачена'
+
+    async def create_log(self, deal_db, text: str):
+        log = self.log
+        new_log = log + f'\n[{now().strftime("%H:%M:%S %d.%m.%y")}]: {text}'
+        await deal_db.update_deal(self.deal_id, log=new_log)

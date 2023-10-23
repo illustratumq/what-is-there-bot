@@ -27,7 +27,7 @@ async def confirm_pay_deal(call: CallbackQuery, callback_data: dict, deal_db: De
     elif callback_data['action'] == 'pay_fully':
         pay_method = 'сплативши всю суму через платіжну систему'
     else:
-        pay_method = 'списавши частину з балансу а решту сплатити через платіжну систему'
+        pay_method = 'списавши частину з балансу, а решту сплатити через платіжну систему'
     text = (
         f'➡️ Ви бажаєте оплатити угоду "{post.title}" у розмірі {need_to_pay + commission} грн,  '
         f'<b>{pay_method}</b>.\n\n Будь-ласка підтвердіть своє рішення'
@@ -70,8 +70,11 @@ async def pay_from_fondy_cmd(call: CallbackQuery, callback_data: dict, deal_db: 
             body.update(pay_from_balance=pay_from_balance)
             await order_db.update_order(order.id, body=body)
     await call.message.delete()
-    await call.message.answer(f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}',
-                              reply_markup=to_bot_kb(url=url, text='Оплатити'))
+    text = (
+        f'🧾 <b>Ваш чек на оплату угоди #{deal.deal_id}</b>\n\n'
+        f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}'
+    )
+    await call.message.answer(text, reply_markup=to_bot_kb(url=url, text='Оплатити'))
 
 async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
                                user_db: UserRepo, commission_db: CommissionRepo):
@@ -90,17 +93,14 @@ async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db
     await user_db.update_user(deal.customer_id, balance=customer.balance - need_to_pay - commission)
     await deal_db.update_deal(deal.deal_id, payed=deal.payed + need_to_pay, commission=deal.commission + commission)
     text_to_chat = (
-        f'🔔 Угода була успішно сплачена, кошти зберігаються на балансі сервісу. '
-        f'{executor.create_html_link("Виконавець")} можете приступати до роботи!'
-    )
-    text_to_executor = (
-        f'🔔 Замовник оплатив угоду "{post.title}", можете приступати до виконання завдання.'
+        f'<b>💳 Угода була успішно сплачена, кошти зберігаються на балансі сервісу.</b>\n\n'
+        f'{executor.create_html_link(executor.full_name)} можете приступати до роботи, '
+        f'{customer.create_html_link(customer.full_name)}, чекайте на рішення.'
     )
     text_to_customer = (
-        f'✅ Угода успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.'
+        f'<i>Угода #{deal.deal_id} успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.</i>'
     )
     await call.message.answer(text_to_customer)
-    await call.bot.send_message(deal.executor_id, text_to_executor)
     await call.bot.send_message(deal.chat_id, text_to_chat)
 
 

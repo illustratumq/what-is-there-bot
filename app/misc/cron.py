@@ -73,14 +73,14 @@ def setup_cron_function(scheduler: ContextSchedulerDecorator):
     #scheduler.add_job(
     #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     #)
-    # scheduler.add_job(
-    #     func=checkout_payments, trigger='interval', seconds=10, name='Перевірка платіжок'
-    # )
-    # scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
-    # scheduler.add_job(
-    #    func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
-    # )
-    log.info('Функції додані в cron...')
+    scheduler.add_job(
+        func=checkout_payments, trigger='interval', seconds=30, name='Перевірка платіжок'
+    )
+    scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
+    scheduler.add_job(
+       func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
+    )
+    log.info('Cron функції успішно заплановані')
 
 
 async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: UserbotController, config: Config):
@@ -91,8 +91,8 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
             customer = await db.user_db.get_user(deal.customer_id)
             if deal.activity_confirm:
                 text = (
-                    f'{customer.create_html_link("Замовник")} та {executor.create_html_link("Виконавець")}, '
-                    f'угода не була оплачена. Підтвердіть акутальність угоди.\n\n'
+                    f'{customer.create_html_link(customer.full_name)} та {executor.create_html_link(executor.full_name)}, '
+                    f'ваша угода актуальна?.\n\n'
                     f'Зауважте, якщо впродовж наступних 12 годин, не підтвердити актуальність угоди, '
                     f'вона буде автоматично відмінена.'
                 )
@@ -102,8 +102,9 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                     activity_confirm=False)
             else:
                 post = await db.post_db.get_post(deal.post_id)
+                room = await db.room_db.get_room(deal.chat_id)
                 message = (
-                    f'Угода "{post.title}" була відмінена автоматично, через неактивність у чаті.'
+                    f'<i>Угода "{post.title}" ({room.name}) була відмінена автоматично, через неактивність у чаті.</i>'
                 )
                 bot.set_current(bot)
                 await cancel_deal_processing(bot, deal, post, customer, None, db.deal_db, db.post_db, db.user_db,
@@ -115,11 +116,7 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
     db = database(session)
     for order in await db.order_db.get_orders_status(OrderStatusEnum.PROCESSING):
         response = (await fondy.check_order(order))['response']
-        # deal = await db.deal_db.get_deal(order.deal_id)
         if response['order_status'] == 'approved':
-            # deal = await db.deal_db.get_deal(order.deal_id)
-            # answer = await fondy.make_capture(order, deal.price)
-            # await bot.send_message(deal.chat_id, answer)
             deal = await db.deal_db.get_deal(int(response['merchant_data']))
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
@@ -128,21 +125,17 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
                 need_to_pay += int(order.body['pay_from_balance'])
             commission_package = await db.commission_db.get_commission(customer.commission_id)
             commission = commission_package.deal_commission(deal)
-            post = await db.post_db.get_post(deal.post_id)
             await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + need_to_pay - commission,
                                          commission=deal.commission + commission)
             text_to_chat = (
-                f'🔔 Угода була успішно сплачена, кошти зберігаються на балансі сервісу. '
-                f'{executor.create_html_link("Виконавець")} можете приступати до роботи!'
-            )
-            text_to_executor = (
-                f'🔔 Замовник оплатив угоду "{post.title}", можете приступати до виконання завдання.'
+                f'<b>💳 Угода була успішно сплачена, кошти зберігаються на балансі сервісу.</b>\n\n'
+                f'{executor.create_html_link(executor.full_name)} можете приступати до роботи, '
+                f'{customer.create_html_link(customer.full_name)}, чекайте на рішення.'
             )
             text_to_customer = (
-                f'✅ Угода успішно оплачена'
+                f'<i>Угода #{deal.deal_id} успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.</i>'
             )
             await bot.send_message(deal.customer_id, text_to_customer)
-            await bot.send_message(deal.executor_id, text_to_executor)
             await bot.send_message(deal.chat_id, text_to_chat)
             await db.order_db.update_order(order.id, status=OrderStatusEnum.APPROVED)
 

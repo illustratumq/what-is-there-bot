@@ -37,7 +37,7 @@ class Post(TimedBaseModel):
             f'{hide_link(self.media_url)}'
         )
         if use_bot_link:
-            text += f'\n\n<a href="https://t.me/ENTERinBOT">Відправити своє завдання</a>'
+            text += f'\n<a href="https://t.me/ENTERinBOT">Відправити своє завдання</a>'
         return text
 
     def construct_post_text_shorted(self):

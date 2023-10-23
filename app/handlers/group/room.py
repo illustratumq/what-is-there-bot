@@ -11,14 +11,14 @@ from app.database.models import Deal
 from app.database.services.enums import DealTypeEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo
 from app.handlers.userbot import UserbotController
-from app.keyboards.inline.chat import room_menu_kb, room_cb
+from app.keyboards.inline.chat import room_menu_kb, room_cb, call_another_user
 from app.keyboards.inline.deal import help_admin_kb, add_chat_cb, add_admin_chat_kb
 from app.misc.commands import set_new_room_commands
 
 
 async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, user_db: UserRepo,
-                                    post_db: PostRepo, userbot: UserbotController, config: Config,
-                                    state: FSMContext):
+                                    post_db: PostRepo, userbot: UserbotController, room_db: RoomRepo,
+                                    config: Config, state: FSMContext):
     deal = await deal_db.get_deal_chat(cjr.chat.id)
     if not deal or cjr.from_user.id not in deal.participants:
         await cjr.bot.send_message(cjr.from_user.id, 'Ви не є учасником цього завдання')
@@ -32,10 +32,14 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
     if deal.customer_id in members and deal.executor_id in members:
         await deal_db.update_deal(
             deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
-        await full_room_action(cjr, deal, user_db, post_db)
+        await full_room_action(cjr, deal, user_db, post_db, config)
+        await room_db.update_room(deal.chat_id, both_in_chat=True)
+        await deal.create_log(deal_db, f'Угода розпочата з ціною {deal.price}')
     else:
+        user = 'виконавця' if cjr.from_user.id == deal.customer_id else 'замовника'
         await cjr.bot.send_message(
-            cjr.chat.id, text='Зачекайте, доки приєднається інший користувач'
+            cjr.chat.id, text='Зачекайте, доки приєднається інший користувач',
+            reply_markup=call_another_user(deal, user)
         )
 
 
@@ -47,12 +51,11 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     admin = await user_db.get_user(admin_id)
     reply_markup = add_admin_chat_kb(deal, admin)
     try:
-        print(deal.chat_id, admin_id)
         await userbot.add_chat_member(deal.chat_id, admin_id)
     except UserAlreadyParticipant:
         room = await room_db.get_room(deal.chat_id)
-        await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}', disable_web_page_preview=True,
-                                  reply_markup=reply_markup)
+        await call.message.answer(f'Ви вже є учасником цієї групи: {room.invite_link}',
+                                  disable_web_page_preview=True, reply_markup=reply_markup)
     except Exception as Error:
         await call.message.answer(f'Схоже юзербот не може додати вас у чат, причина:\n\n{Error}',
                                   reply_markup=reply_markup)
@@ -61,7 +64,7 @@ async def add_admin_to_chat_cmd(call: CallbackQuery, callback_data: dict, deal_d
     await call.message.delete()
 
 
-async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo):
+async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, post_db: PostRepo, config: Config):
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     post = await post_db.get_post(deal.post_id)
@@ -79,6 +82,7 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
     if deal.type == DealTypeEnum.PUBLIC:
         message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
     await cjr.chat.pin_message(message_id=message.message_id)
+    await cjr.bot.copy_message(cjr.chat.id, config.misc.media_channel_chat_id, post.media_id)
     text = (
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
@@ -87,15 +91,21 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     media = all([bool(post.media_url), deal.no_media == False])
+    pay_button = deal.payed < deal.price
     await message.answer(
-        text=f'{text}\nДля повторного виклику натисніть /menu', reply_markup=room_menu_kb(deal, media=media)
+        text=f'{text}\nДля повторного виклику натисніть /menu',
+        reply_markup=room_menu_kb(deal, media=media, pay_button=pay_button)
     )
 
 
 async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
-                        user_db: UserRepo):
+                        user_db: UserRepo, room_db: RoomRepo):
     deal = await deal_db.get_deal_chat(msg.chat.id)
     post = await post_db.get_post(deal.post_id)
+    room = await room_db.get_room(deal.chat_id)
+    if not room.both_in_chat:
+        await msg.delete()
+        return
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     text = (
@@ -106,8 +116,9 @@ async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     media = all([bool(post.media_url), deal.no_media == False])
+    pay_button = deal.payed < deal.price
     await msg.answer(
-        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0)
+        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0, pay_button=pay_button)
     )
 
 
@@ -127,8 +138,9 @@ async def cancel_action_cmd(call: CallbackQuery, deal_db: DealRepo, post_db: Pos
         f'<b>Статус угоди</b>: {deal.chat_status}\n'
     )
     media = all([bool(post.media_url), deal.no_media == False])
+    pay_button = any([deal.payed < deal.payed, all([deal.payed < 0, deal.price > 0])])
     await call.message.edit_text(
-        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0)
+        text, reply_markup=room_menu_kb(deal, media=media, payed=deal.payed > 0, pay_button=pay_button)
     )
 
 
@@ -151,16 +163,6 @@ async def confirm_room_activity(call: CallbackQuery, callback_data: dict, deal_d
     deal = await deal_db.get_deal(deal_id)
     await deal_db.update_deal(deal.deal_id, activity_confirm=True,
                               next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
-    user = await user_db.get_user(call.from_user.id)
-    text = (
-        f'✅ {user.create_html_link("Замовник" if user.user_id == deal.customer_id else "Виконавець")} підтвердив '
-        f'актуальність угоди. Можете провдожувати роботу!\n\n'
-        f'Зверніть увагу, повідомлення про активність в чаті автоматично надисилається кожні 12 годин, якщо '
-        f'ваша угода неоплачена.\n\n'
-        f'Якщо протягом настпуних 12 годин, після цього, активність не буде підтверджена, угода буде '
-        f'автоматично відмінена.'
-    )
-    await call.bot.send_message(deal.chat_id, text)
 
 
 async def call_admin_to_room_cmd(call: CallbackQuery, deal_db: DealRepo, room_db: RoomRepo, config: Config):

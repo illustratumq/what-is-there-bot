@@ -3,6 +3,7 @@ import logging
 
 import aiogram
 import betterlogging as bl
+import pyrogram
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.redis import RedisStorage2
 from aiogram.types import ParseMode, AllowedUpdates, BotCommand
@@ -46,9 +47,9 @@ async def main():
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
-    userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
+    # userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
     fondy = FondyApiWrapper(config)
-    scheduler = compose_scheduler(config, bot, sqlalchemy_session, userbot, fondy)
+    scheduler = compose_scheduler(config, bot, sqlalchemy_session, None, fondy)
 
     allowed_updates = (
             AllowedUpdates.MESSAGE + AllowedUpdates.CALLBACK_QUERY +
@@ -57,7 +58,7 @@ async def main():
             AllowedUpdates.INLINE_QUERY
     )
 
-    environments = dict(config=config, dp=dp, scheduler=scheduler, userbot=userbot, fondy=fondy)
+    environments = dict(config=config, dp=dp, scheduler=scheduler, fondy=fondy)
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
     setup_cron_function(scheduler)
@@ -66,6 +67,7 @@ async def main():
     await setup_default_commission_pack(sqlalchemy_session)
     await notify_admin(bot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
+
 
     try:
         scheduler.start()
@@ -76,8 +78,21 @@ async def main():
         await storage.wait_closed()
         await (await bot.get_session()).close()
         await db_engine.dispose()
+        # await userbot._client.stop()
 
 if __name__ == '__main__':
+
+    def get_peer_type(peer_id: int) -> str:
+        peer_id_str = str(peer_id)
+        if not peer_id_str.startswith("-"):
+            return "user"
+        elif peer_id_str.startswith("-100"):
+            return "channel"
+        else:
+            return "chat"
+
+    pyrogram.utils.get_peer_type = get_peer_type
+
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):

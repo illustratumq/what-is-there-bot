@@ -15,10 +15,10 @@ from app.misc.times import now
 
 class UserbotController:
     def __init__(self, config: UserBot, bot_username: str, chat_photo_path: str):
-        try:
-            self._client = Client(config.session_name, no_updates=True)
-        except AttributeError:
-            self._client = Client(config.session_name, config.api_id, config.api_hash, no_updates=True)
+        # try:
+        self._client = Client(config.session_name, no_updates=True)
+        # except AttributeError:
+        #     self._client = Client(config.session_name, config.api_id, config.api_hash, no_updates=True)
         self._bot_username = bot_username
         self._chat_photo_path = chat_photo_path
 
@@ -42,6 +42,10 @@ class UserbotController:
         return members
 
     async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink, str]:
+        '''
+        :param last_room_number: room_id of last created room
+        :return: chat, invite_link, room_name
+        '''
         await self.connect()
         client = self._client
         chat, room_name = await self._create_group(client, last_room_number)
@@ -89,8 +93,9 @@ class UserbotController:
             await self._invoke(client, raw)
 
     async def add_chat_member(self, chat_id: int, user_id: int):
-        await self.connect()
-        await self._client.add_chat_members(chat_id=chat_id, user_ids=user_id)
+        # await self.connect()
+        client = self._client
+        await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
         # async with self._client as client:
         #     client: Client
         #     await client.add_chat_members(chat_id=chat_id, user_ids=user_id)

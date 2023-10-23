@@ -17,7 +17,7 @@ from app.misc.media import make_post_media_template
 
 
 async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo,
-                          post_db: PostRepo, room_db: RoomRepo, config: Config, join_db: JoinRepo,
+                          post_db: PostRepo, room_db: RoomRepo, config: Config, join_db: JoinRepo, user_db: UserRepo,
                           userbot: UserbotController, state: FSMContext):
     await call.message.delete_reply_markup()
     join = await join_db.get_join(int(callback_data['join_id']))
@@ -54,6 +54,9 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
         f'<b>Угода ухвалена 👌</b>\n\nЗаходьте до кімнати замовлення "{post.title}" за цим посиланням:\n\n'
         f'{invite_link}\n\nАбо натисніть на кнопку під цим повідомленням'
     )
+    executor = await user_db.get_user(join.executor_id)
+    await deal.create_log(deal_db, f'Угода ухвалена з {executor.full_name} ({join.executor_id})')
+    await deal.create_log(deal_db, f'Визначено чат угоди {room_chat_id}')
     customer_msg = await call.bot.send_message(
         deal.customer_id, text=text, reply_markup=join_room_kb(invite_link), disable_web_page_preview=True)
     executor_msg = await call.bot.send_message(

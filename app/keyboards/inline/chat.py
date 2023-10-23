@@ -5,7 +5,13 @@ room_cb = CallbackData('rm', 'deal_id', 'action')
 evaluate_cb = CallbackData('ev', 'deal_id', 'action', 'value')
 
 
-def room_menu_kb(deal: Deal, media: bool = False, payed: bool = False):
+def call_another_user(deal: Deal, user: str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        InlineKeyboardButton(Buttons.chat.call_user.format(user),
+                             callback_data=room_cb.new(deal_id=deal.deal_id, action='call_another'))
+    ])
+
+def room_menu_kb(deal: Deal, media: bool = False, payed: bool = False, pay_button: bool = False):
 
     def button_cb(action: str):
         return dict(callback_data=room_cb.new(deal_id=deal.deal_id, action=action))
@@ -14,13 +20,14 @@ def room_menu_kb(deal: Deal, media: bool = False, payed: bool = False):
         [InlineKeyboardButton(Buttons.chat.edit_price, **button_cb('price'))],
     ]
 
+    if pay_button:
+        inline_keyboard.insert(0, [InlineKeyboardButton(Buttons.chat.pay, **button_cb('pay'))])
+
     if payed:
         close_deal_button = [
             InlineKeyboardButton(Buttons.chat.end_deal, **button_cb('end_deal')),
-            # InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))
         ]
     else:
-        inline_keyboard.insert(0, [InlineKeyboardButton(Buttons.chat.pay, **button_cb('pay'))])
         close_deal_button = [InlineKeyboardButton(Buttons.chat.cancel_deal, **button_cb('cancel_deal'))]
 
     inline_keyboard += [
@@ -88,12 +95,15 @@ def evaluate_deal_kb(deal: Deal, comment: bool = False, only_close: bool = False
         return dict(callback_data=evaluate_cb.new(deal_id=deal.deal_id, action=action, value=f'{value}'))
 
     inline_keyboard = [
-        [InlineKeyboardButton(f'{i}⭐', **button_cb(i)) for i in range(1, 6)],
-        [InlineKeyboardButton(Buttons.deal.close, **button_cb(0, 'close'))]
+        [InlineKeyboardButton(f'⭐'*i, **button_cb(i))] for i in list(range(1, 6))[::-1]
     ]
+    inline_keyboard += [[InlineKeyboardButton(Buttons.deal.close, **button_cb(0, 'close'))]]
 
     if comment:
-        inline_keyboard[0] = [InlineKeyboardButton(Buttons.deal.comment, **button_cb(0, 'comment'))]
+        inline_keyboard = [
+            [InlineKeyboardButton(Buttons.deal.comment, **button_cb(0, 'comment'))],
+            [InlineKeyboardButton(Buttons.deal.close, **button_cb(0, 'close'))]
+        ]
 
     if only_close:
         inline_keyboard = [
@@ -106,8 +116,8 @@ def evaluate_deal_kb(deal: Deal, comment: bool = False, only_close: bool = False
 def confirm_deal_activity(deal: Deal):
 
     inline_keyboard = [
-        [InlineKeyboardButton(Buttons.deal.confirm_activity,
-                              callback_data=room_cb.new(deal_id=deal.deal_id, action='confirm_activity'))]
+        [InlineKeyboardButton('Так', callback_data=room_cb.new(deal_id=deal.deal_id, action='confirm_activity')),
+         InlineKeyboardButton('Ні', callback_data=room_cb.new(deal_id=deal.deal_id, action='delete_activity'))]
     ]
 
     return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)

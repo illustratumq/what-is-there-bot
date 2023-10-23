@@ -214,8 +214,6 @@ class Deal(TimeBaseModel):
                                               help_text='*Визначається автоматично')
     activity_confirm = models.BooleanField(choices=RoomActivityEnum, verbose_name='Підтвердження активності',
                                            default=True)
-    willing_ids = ArrayField(ArrayField(models.CharField(blank=True)), verbose_name='',
-                             editable=False)
 
     def __str__(self):
         return f'Угода №{self.deal_id}'

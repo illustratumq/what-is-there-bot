@@ -79,6 +79,7 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
             'Якщо все готово, переходьте до оплати угоди'
         )
         reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
+        await deal.create_log(deal_db, f'Встановлена нова ціна {deal.price}')
     else:
         if price > deal.payed:
             text += (

@@ -20,6 +20,7 @@ class Room(TimedBaseModel):
     message_id = sa.Column(sa.BIGINT, nullable=True)
     photo_url = sa.Column(sa.VARCHAR(150), nullable=True)
     reason = sa.Column(sa.VARCHAR(150), nullable=True)
+    both_in_chat = sa.Column(sa.BOOLEAN, default=False, nullable=False)
 
     async def construct_admin_moderate_text(self, room_db, bot, config, admin=None, done_action: str = None) -> str:
         if not done_action:

@@ -40,8 +40,8 @@ async def confirm_done_deal_cmd(call: CallbackQuery, callback_data: dict, deal_d
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     text = (
-        f'Щоб <u>Завершити</u> угоду, {executor.create_html_link("Виконавець")} та '
-        f'{customer.create_html_link("Замовник")} повинні підтвердити своє рішення. Для '
+        f'Щоб <u>Завершити</u> угоду, {customer.create_html_link(customer.full_name)} та '
+        f'{executor.create_html_link(executor.full_name)} повинні підтвердити своє рішення. Для '
         f'цього обидва користувачі мають натиснути кнопку "{Buttons.chat.confirm}", після цього чат буде видалено.\n\n'
         f'Будь ласка, не забудьте зберігти матеріали угоди надіслані Виконавцем.'
 
@@ -61,8 +61,8 @@ async def confirm_cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)
     text = (
-        f'Щоб <u>Відмінити</u> угоду, {executor.create_html_link("Виконавець")} та '
-        f'{customer.create_html_link("Замовник")} повинні підтвердити своє рішення. Для '
+        f'Щоб <u>Відмінити</u> угоду, {customer.create_html_link(customer.full_name)} та '
+        f'{executor.create_html_link(executor.full_name)} повинні підтвердити своє рішення. Для '
         f'цього обидва користувачі мають натиснути кнопку "{Buttons.chat.confirm}", після цього чат буде видалено.\n\n'
         f'Будь ласка, не забудьте зберігти матеріали угоди надіслані Виконавцем.'
 
@@ -131,15 +131,10 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
         try:
             if user_id:
                 if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
-                    await bot.kick_chat_member(room.chat_id, user_id)
+                    await userbot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
             log.error(str(error) + f'\n{deal.deal_id=}')
-    # if room.admin_id:
-    #     try:
-    #         if room.admin_id != await userbot.get_client_user_id():
-    #             await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
-    #     except Exception as error:
-    #         log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
+
     if deal.type == DealTypeEnum.PRIVATE:
         if deal.customer_id == post.user_id:
             await deal_db.update_deal(deal.deal_id, executor_id=None)
@@ -231,12 +226,6 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
                         await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
             except Exception as error:
                 log.error(str(error) + f'\n{deal.deal_id=}')
-        # if room.admin_id:
-        #     try:
-        #         await userbot.kick_chat_member(deal.chat_id, user_id=room.admin_id)
-        #     except Exception as error:
-        #         log.error('while delete admin' + str(error) + f'\n{deal.deal_id=}')
-
         if deal.type == DealTypeEnum.PRIVATE:
             if deal.customer_id == post.user_id:
                 await deal_db.update_deal(deal.deal_id, executor_id=None)
@@ -245,7 +234,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
 
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
         await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
-        await deal_db.update_deal(deal.deal_id, chat_id=None, commission=full_commission)
+        await deal_db.update_deal(deal.deal_id, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
 
@@ -288,6 +277,15 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')
 
+async def delete_chat_by_activity(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
+                                  post_db: PostRepo, state: FSMContext, room_db: RoomRepo, join_db: JoinRepo,
+                                  commission_db: CommissionRepo, userbot: UserbotController, config: Config):
+    deal_id = int(callback_data['deal_id'])
+    deal = await deal_db.get_deal(deal_id)
+    post = await post_db.get_post(deal.post_id)
+    customer = await user_db.get_user(deal.customer_id)
+    await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
+                                 commission_db, join_db, userbot, config)
 
 async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: UserRepo,
                                   post_db: PostRepo, state: FSMContext, room_db: RoomRepo, userbot: UserbotController,
@@ -325,5 +323,9 @@ def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
         handle_confirm_cancel_deal, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='conf_cancel_deal'),
         state='conf_cancel_deal')
+    dp.register_callback_query_handler(
+        delete_chat_by_activity, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='delete_activity'),
+        state='*'
+    )
     dp.register_message_handler(
         left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
