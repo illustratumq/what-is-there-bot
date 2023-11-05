@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 from pathlib import Path
 
@@ -6,8 +7,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-0&r)==_ztfy(*v0_s0(jhm9x6a6of+t=z4$3l=ap#)=kx$7j!%'
 DEBUG = True
 
+class Device:
+    SERVER = 'SERVER'
+    WINDOWS = 'WINDOWS'
 
-sys.path.append(r'\Users\pasho\FreelanceProject\what-is-there-bot')  # /src
+    @staticmethod
+    def current():
+        return Device.WINDOWS if platform.system().lower() == 'windows' else Device.SERVER
+
+
+if Device.current() == Device.WINDOWS:
+    path = r'\Users\pasho\FreelanceProject\what-is-there-bot'
+else:
+    path = '/src'
+
+sys.path.append(path)
 from app.config import Config
 from app.website.website.jazzmin_settings import JAZZMIN_SETTINGS
 
