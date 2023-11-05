@@ -12,7 +12,7 @@ services:
     command: >
       sh -c "
         #python /app/website/manage.py migrate --fake-initial &&
-        #python /app/website/manage.py makemigrations instapuller &&
+        #python /app/website/manage.py makemigrations whaistherebot &&
         #python /app/website/manage.py createsuperuser --noinput &&
         #python /app/website/manage.py runserver 0.0.0.0:8000&
         python -O bot.py"

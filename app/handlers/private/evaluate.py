@@ -40,7 +40,7 @@ async def save_comment_deal(msg: Message, deal_db: DealRepo, user_db: UserRepo, 
     last_msg_id = data['last_msg_id']
     comment = msg.html_text
     await msg.delete()
-    if len(comment) > 300:
+    if len(comment) > 500:
         await msg.answer(f'Упс, ваш відгук занадто великий ({len(comment)}/500), будь-ласка спробуйте ще раз.')
         return
     await deal_db.update_deal(deal_id, comment=comment)

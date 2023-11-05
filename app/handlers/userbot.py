@@ -93,12 +93,9 @@ class UserbotController:
             await self._invoke(client, raw)
 
     async def add_chat_member(self, chat_id: int, user_id: int):
-        # await self.connect()
+        await self.connect()
         client = self._client
         await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
-        # async with self._client as client:
-        #     client: Client
-        #     await client.add_chat_members(chat_id=chat_id, user_ids=user_id)
 
     async def kick_chat_member(self, chat_id: int, user_id: int):
         await self.connect()

@@ -17,14 +17,13 @@ from app.states.states import ParticipateSG
 
 
 def is_valid_comment(text: str) -> dict:
+    status = {'status': 'ok'}
     for word in text.split(' '):
         if any([re.match(r'@([A-z]+)$', word), re.match(r'https?\S+', word)]):
             return {'status': 'not valid'}
-    else:
-        if re.match(r'([A-z]+)', text):
-            return {'status': 'suspiciously'}
-        else:
-            return {'status': 'ok'}
+        elif re.match(r'([A-z]+)', word):
+            status.update({'status': 'suspiciously'})
+    return status
 
 
 async def save_deal_comment(msg: Message, join_db: JoinRepo, config: Config, state: FSMContext):
@@ -48,15 +47,6 @@ async def save_deal_comment(msg: Message, join_db: JoinRepo, config: Config, sta
                 f'Твій коментар: <i>{msg.text}</i>'
             )
             await join_db.update_join(join.join_id, comment=msg.text)
-            if text_status != 'ok':
-                warning = (
-                    f'🔴 #ПідозрілийВислів\n\n'
-                    f'Користувач {msg.from_user.get_mention()} ({msg.from_user.id}) '
-                    f'використав підозрілий вираз в своєму коментарі на виконання запиту:\n\n'
-                    f'<i>{msg.text}</i>'
-                )
-                await msg.bot.send_message(
-                    config.misc.admin_channel_id, warning)
         await msg.bot.edit_message_text(text, chat_id=msg.from_user.id, message_id=join.join_msg_id,
                                         reply_markup=send_deal_kb(join, ban=ban))
     else:
@@ -75,7 +65,7 @@ async def close_deal_cmd(call: CallbackQuery, callback_data: dict, join_db: Join
         await call.message.delete()
 
 async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, post_db: PostRepo,
-                        user_db: UserRepo, join_db: JoinRepo, state: FSMContext):
+                        user_db: UserRepo, join_db: JoinRepo, state: FSMContext, config: Config):
     join = await join_db.get_join(int(callback_data['join_id']))
     post = await post_db.get_post(join.post_id)
     user = await user_db.get_user(join.executor_id)
@@ -93,6 +83,16 @@ async def send_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealR
         f'<b>Ви відправили запит на виконання завдання 👌</b>\n\n'
         f'Завдання: {post.title} {hide_link(post.post_url)}'
     )
+    text_status = is_valid_comment(join.comment)['status']
+    if text_status != 'ok':
+        warning = (
+            f'🔴 #ПідозрілийВислів\n\n'
+            f'Користувач {call.from_user.get_mention()} ({call.from_user.id}) '
+            f'використав підозрілий вираз в своєму коментарі на виконання запиту:\n\n'
+            f'<i>{join.comment}</i>'
+        )
+        await call.bot.send_message(
+            config.misc.admin_channel_id, warning)
     await join_db.update_join(join.join_id, status=JoinStatusEnum.ACTIVE)
     await call.message.edit_text(text_to_executor)
     await state.finish()
@@ -151,12 +151,16 @@ async def executor_comments_list(query: InlineQuery, deal_db: DealRepo, user_db:
         for deal in await deal_db.get_comment_deals(executor_id):
             customer = await user_db.get_user(deal.customer_id)
             comment = f' {deal.comment}' if deal.comment else 'Без коментаря'
+            text = (
+                f'{customer.emojize_rating_text(deal.rating)} від {customer.full_name}\n'
+                f'{deal.updated_at.strftime("%d.%m.%Y")} {comment}'
+            )
             results.append(
                 InlineQueryResultArticle(
                     id=deal.deal_id,
                     title=f'{customer.emojize_rating_text(deal.rating)} від {customer.full_name}',
                     description=f'{deal.updated_at.strftime("%d.%m.%Y")} {comment}',
-                    input_message_content=InputTextMessageContent(comment),
+                    input_message_content=InputTextMessageContent(text),
                 )
             )
     await query.answer(results)

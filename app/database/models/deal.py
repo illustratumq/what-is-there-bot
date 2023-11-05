@@ -1,6 +1,7 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ENUM, ARRAY
 
+from app.config import Config
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import DealStatusEnum, DealTypeEnum
 from app.misc.times import now
@@ -42,6 +43,11 @@ class Deal(TimedBaseModel):
             return 'Неоплачена'
 
     async def create_log(self, deal_db, text: str):
-        log = self.log
+        log = self.log if self.log else ''
         new_log = log + f'\n[{now().strftime("%H:%M:%S %d.%m.%y")}]: {text}'
         await deal_db.update_deal(self.deal_id, log=new_log)
+
+    @property
+    def server_url(self):
+        config = Config.from_env()
+        return f'http://{config.misc.server_host_ip}:8000/admin/whatistherebot/deal/{self.deal_id}/change/'

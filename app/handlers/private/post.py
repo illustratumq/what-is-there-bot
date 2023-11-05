@@ -183,7 +183,7 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
         scheduler.add_job(
             publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
             kwargs=dict(post=post, bot=msg.bot, post_db=post_db, marker_db=marker_db, user_db=user_db,
-                        letter_db=letter_db),
+                        letter_db=letter_db, deal_db=deal_db),
             name=f'Публікація поста #{post.post_id} на основному каналі'
         )
         await msg.answer('Ваш пост скоро опублікується 👌', reply_markup=menu_kb())

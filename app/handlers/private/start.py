@@ -43,10 +43,6 @@ greeting_text = (
 
 async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo, letter_db: LetterRepo):
     config = Config.from_env().misc.post_channel_chat_id
-    await msg.bot.create_chat_invite_link(
-        chat_id=config, name='alskdjalksdjlasd',
-        creates_join_request=True
-    )
     bot = (await msg.bot.me).username
     if not msg.from_user.is_bot:
         new_letters = await letter_db.get_new_letters_user(msg.from_user.id)
@@ -66,11 +62,12 @@ async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo, post_db: PostRepo,
-                          join_db: JoinRepo, state: FSMContext):
+                          join_db: JoinRepo, room_db: RoomRepo, state: FSMContext):
     await msg.delete()
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
+    user = await user_db.get_user(msg.from_user.id)
     join = await join_db.get_post_join(deal.customer_id, msg.from_user.id, post.post_id)
     if join and join.status == JoinStatusEnum.USED:
         await join_db.delete_join(join.join_id)
@@ -84,6 +81,9 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
         )
         delete = True
         one_time_join = True
+    elif user.type == UserTypeEnum.ADMIN:
+        await manage_post_cmd(msg, f'{deal.deal_id}', post_db, user_db, deal_db)
+        return
     elif deal.status != DealStatusEnum.ACTIVE:
         text = (
              f'<b>Ти не можеш стати виконавцем завдання</b>\n\n'
@@ -95,10 +95,6 @@ async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, 
         text = 'Ти не можеш долучитися до свого ж завдання'
         delete = True
         one_time_join = True
-    # elif user.type == UserTypeEnum.ADMIN:
-    #     text = 'Ти не можеш долучатись до завдань, будучи адміністратором'
-    #     delete = True
-    #     one_time_join = True
     elif join and join.status == JoinStatusEnum.EDIT and join.comment:
         text = (
             f'<b>Ти хочеш стати виконавцем завдання?</b>\n\n'
@@ -160,24 +156,21 @@ async def admin_help_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, p
     await msg.answer(text_to_admin, reply_markup=add_admin_chat_kb(deal, admin))
 
 
-async def manage_post_cmd(msg: Message, deep_link: re.Match, post_db: PostRepo,
-                          user_db: UserRepo, room_db: RoomRepo, deal_db: DealRepo):
-    await msg.delete()
-    post_id = int(deep_link.groups()[-1])
+async def manage_post_cmd(msg: Message, deep_link: re.Match | str, post_db: PostRepo,
+                          user_db: UserRepo, deal_db: DealRepo):
+    post_id = int(deep_link.groups()[-1]) if isinstance(deep_link, re.Match) else int(deep_link)
     post = await post_db.get_post(post_id)
     text = (
         f'{post.construct_post_text(use_bot_link=False)}\n\n'
     )
+    deal = await deal_db.get_deal_post(post_id)
     if post.status == DealStatusEnum.DONE:
-        deal = await deal_db.get_deal_post(post_id)
-        room = await room_db.get_room(deal.chat_id)
-        text += f'🆔 #Угода_номер_{deal.deal_id} завершилась в {room.construct_html_text(room.name)}'
+        text += f'🆔 #Угода_номер_{deal.deal_id} завершилась'
     elif post.status == DealStatusEnum.BUSY:
-        deal = await deal_db.get_deal_post(post_id)
         customer = await user_db.get_user(deal.customer_id)
         executor = await user_db.get_user(deal.executor_id)
         text += f'<b>Угода укладена між:</b> {customer.mention} (Замовник) та {executor.mention} (Виконавець)'
-    await msg.answer(text, reply_markup=manage_post_kb(post))
+    await msg.answer(text, reply_markup=manage_post_kb(post, deal))
 
 
 async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, room_db: RoomRepo,

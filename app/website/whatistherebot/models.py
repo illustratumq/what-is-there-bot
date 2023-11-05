@@ -214,6 +214,7 @@ class Deal(TimeBaseModel):
                                               help_text='*Визначається автоматично')
     activity_confirm = models.BooleanField(choices=RoomActivityEnum, verbose_name='Підтвердження активності',
                                            default=True)
+    log = models.CharField(verbose_name='Історія угоди', null=True, editable=False)
 
     def __str__(self):
         return f'Угода №{self.deal_id}'
@@ -226,7 +227,7 @@ class BaseForm(ModelForm):
         widgets = {
             'description': Textarea(attrs={'cols': 41, 'rows': 3}),
             'ban_comment': Textarea(attrs={'cols': 41, 'rows': 3}),
-            'comment': Textarea(attrs={'cols': 100, 'rows': 4}),
+            'comment': Textarea(attrs={'cols': 60, 'rows': 7}),
             'about': Textarea(attrs={'cols': 60, 'rows': 7}),
             'title': Textarea(attrs={'cols': 60, 'rows': 1}),
         }

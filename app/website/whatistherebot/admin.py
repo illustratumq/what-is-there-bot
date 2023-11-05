@@ -92,7 +92,7 @@ class DealAdmin(admin.ModelAdmin):
     list_display = ('__str__',  'status', 'view_post_link', 'view_customer_link', 'view_executor_link', 'updated_at')
     search_fields = ('customer_id__startswith', 'executor_id__startswith', 'deal_id__startswith')
     ordering = ['-updated_at']
-    readonly_fields = ('commission', )
+    readonly_fields = ('commission', 'log', 'created_at', 'updated_at')
     autocomplete_fields = ('post_id', 'executor_id', 'customer_id', 'chat_id')
 
     def view_post_link(self, obj):
@@ -121,17 +121,20 @@ class DealAdmin(admin.ModelAdmin):
     view_post_link.short_description = 'Пост'
 
     fieldsets = (
-        ('Прив\'язаність', {
-            'fields': ('post_id', 'customer_id', 'executor_id', 'chat_id')
+        ('Дані про угоду', {
+            'fields': ('log', 'commission', 'price', 'payed', 'status'),
         }),
-        ('Статус та ціна', {
-            'fields': ('commission', 'price', 'payed', 'status'),
+        ('Учасники', {
+            'fields': ('post_id', 'customer_id', 'executor_id', 'chat_id'),
         }),
         ('Оцінка', {
             'fields': ('rating', 'comment')
         }),
         ('Активність у чаті', {
             'fields': [('activity_confirm', 'next_activity_date')]
+        }),
+        ('Дата створення та оновлення', {
+            'fields': [('updated_at', 'created_at')]
         })
     )
 
@@ -146,6 +149,7 @@ class CommissionAdmin(admin.ModelAdmin):
 
     list_display = ('name', 'pack_id', 'commission', 'updated_at')
     search_fields = ('name__startswith', 'pack_id__startswith')
+    readonly_fields = ('created_at', 'updated_at')
     ordering = ['-updated_at']
 
     fieldsets = (
@@ -154,6 +158,9 @@ class CommissionAdmin(admin.ModelAdmin):
         }),
         ('Цінові параметри', {
             'fields': ('trigger', 'under', 'commission', 'minimal', 'maximal'),
+        }),
+        ('Дата створення та оновлення', {
+            'fields': [('updated_at', 'created_at')]
         })
     )
 
@@ -176,5 +183,8 @@ class RoomAdmin(admin.ModelAdmin):
         }),
         ('Модерація в чаті', {
             'fields': ('admin_required', 'admin_id', 'reason'),
+        }),
+        ('Дата створення та оновлення', {
+            'fields': [('updated_at', 'created_at')]
         })
     )

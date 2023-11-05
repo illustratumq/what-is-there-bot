@@ -79,6 +79,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
                                  user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
                                  userbot: UserbotController, config: Config,
                                  message: str = None, reset_state: bool = True):
+    deal_log_text = f'Угода відмінена.'
     if deal.payed > 0:
         back_to_customer = deal.payed
         commission = await commission_db.get_commission(customer.commission_id)
@@ -89,6 +90,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             f'На ваш рахунок повернено {back_to_customer + commission} грн.'
         )
         await bot.send_message(deal.customer_id, text)
+        deal_log_text += f'На рахунок {customer.full_name} повернено {back_to_customer + commission} грн.'
 
     await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
     default_text = f'Угода "{post.title}" була відмінена.'
@@ -145,6 +147,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
     await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
+    await deal.create_log(deal_db, deal_log_text)
 
 
 async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: PostRepo.model, customer: UserRepo.model,
@@ -172,6 +175,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
         await call.message.answer(text)
         return
     else:
+        deal_log_text = 'Угода завершилась за згодою користувачів.'
         executor_commission = await commission_db.get_commission(executor.commission_id)
         customer_commission = await commission_db.get_commission(customer.commission_id)
         commission_for_executor = executor_commission.calculate_commission(deal.price)
@@ -184,6 +188,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             f'Ви можете вивести ці кошти на банківську карту, або використати для оплати іншої угоди.\n\n'
             f'Дякуємо за використання нашого сервісу.'
         )
+        deal_log_text += f' {executor.full_name} нараховано {deal.price - commission_for_executor} грн.'
         await call.bot.send_message(deal.executor_id, text)
         if deal.payed > deal.price:
             back_to_customer = deal.payed - deal.price
@@ -196,6 +201,7 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
                 f'На ваш рахунок повернено {back_to_customer} грн.'
             )
             await call.bot.send_message(deal.customer_id, text)
+            deal_log_text += f' {customer.full_name} повернено {back_to_customer} грн.'
         room = await room_db.get_room(deal.chat_id)
         text = (
             f'Угода "{post.title}" була завершена. Оцініть роботу виконавця від 1 до 5.'
@@ -234,9 +240,10 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
 
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
         await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
-        await deal_db.update_deal(deal.deal_id, commission=full_commission)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
+        await deal_db.update_deal(deal.deal_id, commission=full_commission, chat_id=None)
+        await deal.create_log(deal_db, deal_log_text)
 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
@@ -299,6 +306,7 @@ async def left_chat_member_cancel(msg: Message, deal_db: DealRepo, user_db: User
             text = (
                 f'Угода "{post.title}" була автоматично відмінена. Причина: {user} покинув чат.'
             )
+            await deal.create_log(deal_db, text)
             await cancel_deal_processing(msg.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
                                          commission_db, join_db, userbot, config, message=text)
         else:

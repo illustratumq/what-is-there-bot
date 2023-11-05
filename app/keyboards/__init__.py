@@ -108,8 +108,7 @@ class Commission:
 class AdminPost:
     delete: str = 'Видалити пост 🗑'
     server: str = 'В адмін панель 🖥'
-    delete_comment: str = 'Видалити коментар'
-    delete_rating: str = 'Видалити оцінку'
+    delete_comment: str = 'Видалити коментар / оцінку'
     delete_force: str = 'Видалити примусово'
     main: str = '◀ Назад'
     back: str = 'Закрити'

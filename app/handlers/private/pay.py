@@ -100,6 +100,7 @@ async def pay_from_balance_cmd(call: CallbackQuery, callback_data: dict, deal_db
     text_to_customer = (
         f'<i>Угода #{deal.deal_id} успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.</i>'
     )
+    await deal.create_log(deal_db, f'Угода оплачена з балансу {need_to_pay} грн. + {commission} грн.')
     await call.message.answer(text_to_customer)
     await call.bot.send_message(deal.chat_id, text_to_chat)
 

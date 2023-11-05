@@ -9,6 +9,7 @@ DEBUG = True
 
 sys.path.append(r'\Users\pasho\FreelanceProject\what-is-there-bot')  # /src
 from app.config import Config
+from app.website.website.jazzmin_settings import JAZZMIN_SETTINGS
 
 config = Config.from_env()
 
@@ -18,6 +19,7 @@ ALLOWED_HOSTS = ['*']  # , config.misc.server_host_ip
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,10 +41,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'website.urls'
 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

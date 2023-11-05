@@ -75,12 +75,16 @@ async def user_comments_list(query: InlineQuery, deal_db: DealRepo, user_db: Use
         for deal in deals:
             customer = await user_db.get_user(deal.customer_id)
             comment = f' {deal.comment}' if deal.comment else 'Без коментаря'
+            text = (
+                f'{customer.emojize_rating_text(deal.rating)} від {customer.full_name}\n'
+                f'{deal.updated_at.strftime("%d.%m.%Y")} {comment}'
+            )
             results.append(
                 InlineQueryResultArticle(
                     id=deal.deal_id,
                     title=f'{customer.emojize_rating_text(deal.rating)} від {customer.full_name}',
                     description=f'{deal.updated_at.strftime("%d.%m.%Y")} {comment}',
-                    input_message_content=InputTextMessageContent(comment),
+                    input_message_content=InputTextMessageContent(text),
                 )
             )
 

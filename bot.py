@@ -47,7 +47,7 @@ async def main():
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
-    # userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
+    userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
     fondy = FondyApiWrapper(config)
     scheduler = compose_scheduler(config, bot, sqlalchemy_session, None, fondy)
 
@@ -58,7 +58,7 @@ async def main():
             AllowedUpdates.INLINE_QUERY
     )
 
-    environments = dict(config=config, dp=dp, scheduler=scheduler, fondy=fondy)
+    environments = dict(config=config, dp=dp, scheduler=scheduler, fondy=fondy, userbot=userbot)
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
     setup_cron_function(scheduler)
@@ -78,7 +78,7 @@ async def main():
         await storage.wait_closed()
         await (await bot.get_session()).close()
         await db_engine.dispose()
-        # await userbot._client.stop()
+        await userbot._client.stop()
 
 if __name__ == '__main__':
 

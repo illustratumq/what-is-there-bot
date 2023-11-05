@@ -80,12 +80,16 @@ async def publish_all_posts_cmd(call: CallbackQuery, callback_data: dict, post_d
     await state.finish()
     delay = int(callback_data['delay'])
     posts = await post_db.get_posts_status(DealStatusEnum.MODERATE)
+    admin = await user_db.get_user(call.from_user.id)
     for post in posts:
         if post.admin_message_id:
             await post_db.update_post(post.post_id, status=DealStatusEnum.WAIT)
             await call.bot.edit_message_text(chat_id=config.misc.admin_channel_id, message_id=post.admin_message_id,
                                              text=post.construct_post_text(use_bot_link=False),
                                              disable_web_page_preview=False if post.media_url else True)
+            deal = await deal_db.get_deal(post.deal_id)
+            await deal.create_log(deal_db, f'Пост угоди поставлений в автоматичний сет публікації адміном '
+                                  f'{admin.full_name}. Публікація відбудеться через {delay} с.')
         scheduler.add_job(
             func=publish_all_posts_processing, name=f'Публікація поста в резервному каналі через {delay} c.',
             next_run_time=next_run_time(delay), trigger='date', misfire_grace_time=300,
@@ -142,6 +146,8 @@ async def admin_cancel_cmd(call: CallbackQuery, callback_data: dict, post_db: Po
         f'<b>Модератор:</b> {call.from_user.mention}\n\n'
         f'{post.construct_post_text(use_bot_link=False)}'
     )
+    deal = await deal_db.get_deal(post.deal_id)
+    await deal.create_log(deal_db, f'Пост угоди відхилений адміном {admin.full_name}')
     await deal_db.delete_deal(post.deal_id)
     await post_db.update_post(post.post_id, status=DealStatusEnum.DISABLES)
     # await post_db.delete_post(post.post_id)
@@ -179,7 +185,7 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     scheduler.add_job(
         publish_post_base_channel, trigger='date', next_run_time=next_run_time(60), misfire_grace_time=600,
         kwargs=dict(post=post, bot=call.bot, post_db=post_db, marker_db=marker_db, user_db=user_db,
-                    letter_db=letter_db, config=config),
+                    letter_db=letter_db, config=config, deal_db=deal_db),
         name=f'Публікація поста #{post.post_id} на основному каналі'
     )
     admin_channel_text = (
@@ -190,10 +196,11 @@ async def admin_approve_cmd(call: CallbackQuery, callback_data: dict, post_db: P
     await call.bot.edit_message_text(text=admin_channel_text, chat_id=config.misc.admin_channel_id,
                                      message_id=post.admin_message_id, reply_markup=await after_public_edit_kb(post),
                                      disable_web_page_preview=False if post.media_url else True)
-
+    deal = await deal_db.get_deal(post.deal_id)
+    await deal.create_log(deal_db, f'Пост угоди схвалений адміном {admin.full_name}')
 
 async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, marker_db: MarkerRepo, user_db: UserRepo,
-                                    letter_db: LetterRepo, config: Config):
+                                    letter_db: LetterRepo, config: Config, deal_db: DealRepo):
     post = await post_db.get_post(post.post_id)
     if post:
         reply_markup = participate_kb(await post.participate_link) if post.status == DealStatusEnum.ACTIVE else None
@@ -203,6 +210,8 @@ async def publish_post_base_channel(post: Post, bot: Bot, post_db: PostRepo, mar
         )
         await post_db.update_post(post.post_id, message_id=message.message_id, post_url=message.url)
         text = f'Ваш пост <b>{post.title}</b> було опубліковано'
+        deal = await deal_db.get_deal(post.deal_id)
+        await deal.create_log(deal_db, 'Пост опубліковано в основному каналі')
         await bot.send_message(post.user_id, text=text, disable_web_page_preview=True,
                                reply_markup=to_bot_kb(post.post_url, text='Перейти до посту'))
         await letter_db.add(

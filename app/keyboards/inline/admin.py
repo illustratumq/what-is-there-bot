@@ -71,7 +71,7 @@ def user_setting_kb(deal: Deal, setting: Setting):
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 
 
-def manage_post_kb(post: Post):
+def manage_post_kb(post: Post, deal: Deal):
 
     def button_cb(action: str):
         return dict(callback_data=manage_post_cb.new(post_id=post.post_id, action=action))
@@ -79,8 +79,7 @@ def manage_post_kb(post: Post):
     inline_keyboard = [
         [InlineKeyboardButton(Buttons.admin.post.delete, **button_cb('delete')),
          InlineKeyboardButton(Buttons.admin.post.server, url=post.server_url)],
-        [InlineKeyboardButton(Buttons.admin.post.delete_comment, **button_cb('delete_comment')),
-         InlineKeyboardButton(Buttons.admin.post.delete_rating, **button_cb('delete_rating'))],
+        [InlineKeyboardButton(Buttons.admin.post.delete_comment, url=deal.server_url)],
         [InlineKeyboardButton(Buttons.admin.post.back, **button_cb('close'))]
     ]
 

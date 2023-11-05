@@ -121,12 +121,18 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
             need_to_pay = int(int(response['actual_amount']) / 100)
+            log_text = f'Угода оплачена: через платіжну систему {need_to_pay} грн. ({order.id=})'
             if 'pay_from_balance' in order.body.keys():
-                need_to_pay += int(order.body['pay_from_balance'])
+                pay_from_balance = int(order.body['pay_from_balance'])
+                need_to_pay += pay_from_balance
+                log_text += f' з частковою оплатою з балансу {pay_from_balance} грн.'
             commission_package = await db.commission_db.get_commission(customer.commission_id)
             commission = commission_package.deal_commission(deal)
             await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + need_to_pay - commission,
                                          commission=deal.commission + commission)
+            # TODO: перевірити розрахунок комісії
+            log_text += f' комісія {commission} грн.'
+            await deal.create_log(db.deal_db, log_text)
             text_to_chat = (
                 f'<b>💳 Угода була успішно сплачена, кошти зберігаються на балансі сервісу.</b>\n\n'
                 f'{executor.create_html_link(executor.full_name)} можете приступати до роботи, '
