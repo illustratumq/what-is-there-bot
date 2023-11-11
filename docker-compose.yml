@@ -11,10 +11,10 @@ services:
       - ./app:/src/app
     command: >
       sh -c "
-        #python /app/website/manage.py migrate --fake-initial &&
-        #python /app/website/manage.py makemigrations whaistherebot &&
-        #python /app/website/manage.py createsuperuser --noinput &&
-        #python /app/website/manage.py runserver 0.0.0.0:8000&
+        #python ./app/website/manage.py migrate --fake-initial &&
+        #python ./app/website/manage.py makemigrations whatistherebot &&
+        #python ./app/website/manage.py createsuperuser --noinput &&
+        python ./app/website/manage.py runserver 0.0.0.0:8000&
         python -O bot.py"
     restart: unless-stopped
     ports:
@@ -22,11 +22,10 @@ services:
     env_file:
       - ".env"
     environment:
-      DB_HOST: database
+      DB_HOST: "${DB_HOST}"
       REDIS_HOST: redis
     depends_on:
-      - database
-      - redis
+     - redis
     networks:
      - botnet
 
@@ -42,36 +41,6 @@ services:
     restart: unless-stopped
     networks:
       - botnet
-
-  database:
-    container_name: "${BOT_NAME}-database"
-    image: postgres:14-alpine
-    ports:
-      - "${DB_PORT}:${DB_PORT}"
-    restart: unless-stopped
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
-    command: "postgres -c max_connections=150 -c shared_buffers=512MB -c effective_cache_size=1536MB
-              -c maintenance_work_mem=128MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB
-              -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=200
-              -c work_mem=3495kB -c min_wal_size=1GB -c max_wal_size=4GB -c max_worker_processes=2
-              -c max_parallel_workers_per_gather=1 -c max_parallel_workers=2 -c max_parallel_maintenance_workers=1"
-    env_file:
-      - ".env"
-    depends_on:
-      - redis
-    environment:
-      POSTGRES_USER: $DB_USER
-      POSTGRES_PASSWORD: $DB_PASS
-      POSTGRES_DB: $DB_NAME
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "200k"
-        max-file: "10"
-    networks:
-      - botnet
-
 
 networks:
   botnet:
