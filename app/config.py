@@ -58,6 +58,7 @@ class Miscellaneous:
     admin_channel_id: int
     reserv_channel_id: int
     database_channel_id: int
+    history_channel_id: int
     chat_activity_period: int
     timezone: str
 
@@ -105,7 +106,8 @@ class Config:
                 timezone=env.str('TIMEZONE'),
                 server_host_ip=env.str('SERVER_HOST_IP'),
                 database_channel_id=env.str('DATABASE_CHANNEL_ID'),
-                chat_activity_period=env.int('CHAT_ACTIVITY_PERIOD')
+                chat_activity_period=env.int('CHAT_ACTIVITY_PERIOD'),
+                history_channel_id=env.int('HISTORY_CHANNEL_ID')
             ),
             userbot=UserBot(
                 api_id=env.str('USERBOT_API_ID', None),

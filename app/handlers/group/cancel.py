@@ -358,7 +358,7 @@ async def copy_and_delete_history(userbot: UserbotController, room: RoomRepo.mod
         f'🆔 #Угода_номер_{deal.deal_id}\n'
         f'=============================='
     )
-    await bot.send_message(config.misc.media_channel_chat_id, history_start_msg)
+    await bot.send_message(config.misc.history_channel_id, history_start_msg)
     messages = await userbot.get_chat_history(room.chat_id)
     chat_users = [customer.user_id, executor.user_id]
     for message in messages:
@@ -369,11 +369,11 @@ async def copy_and_delete_history(userbot: UserbotController, room: RoomRepo.mod
                     sender_name = f'{message.from_user.mention}: ' if message.from_user.id in chat_users else ''
                     text = f'{sender_name}{message.text}'
                     await client.send_message(
-                        config.misc.media_channel_chat_id, text
+                        config.misc.history_channel_id, text
                     )
             else:
-                await userbot._client.copy_message(config.misc.media_channel_chat_id, room.chat_id, message.id)
+                await userbot._client.copy_message(config.misc.history_channel_id, room.chat_id, message.id)
         except:
             pass
-    await bot.send_message(config.misc.media_channel_chat_id, history_end_msg)
+    await bot.send_message(config.misc.history_channel_id, history_end_msg)
     await userbot.delete_group(room.chat_id)
