@@ -18,11 +18,12 @@ from app.states.states import ParticipateSG
 
 def is_valid_comment(text: str) -> dict:
     status = {'status': 'ok'}
-    for word in text.split(' '):
-        if any([re.match(r'@([A-z]+)$', word), re.match(r'https?\S+', word)]):
-            return {'status': 'not valid'}
-        elif re.match(r'([A-z]+)', word):
-            status.update({'status': 'suspiciously'})
+    if text:
+        for word in text.split(' '):
+            if any([re.match(r'@([A-z]+)$', word), re.match(r'https?\S+', word)]):
+                return {'status': 'not valid'}
+            elif re.match(r'([A-z]+)', word):
+                status.update({'status': 'suspiciously'})
     return status
 
 

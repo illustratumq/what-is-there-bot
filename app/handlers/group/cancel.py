@@ -142,7 +142,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             await deal_db.update_deal(deal.deal_id, executor_id=None)
         else:
             await deal_db.update_deal(deal.deal_id, customer_id=None)
-
+    executor = await user_db.get_user(deal.executor_id)
     join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
     await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
@@ -238,11 +238,13 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             else:
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
+        await copy_and_delete_history(userbot, room, deal, customer, executor, config, call.bot)
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
         await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
         await deal_db.update_deal(deal.deal_id, commission=full_commission, chat_id=None)
+        await room_db.delete_room(room.chat_id)
         await deal.create_log(deal_db, deal_log_text)
 
 
@@ -337,3 +339,41 @@ def setup(dp: Dispatcher):
     )
     dp.register_message_handler(
         left_chat_member_cancel, ChatTypeFilter(ChatType.GROUP), content_types=ContentTypes.LEFT_CHAT_MEMBER, state='*')
+
+
+async def copy_and_delete_history(userbot: UserbotController, room: RoomRepo.model, deal: DealRepo.model,
+                                  customer: UserRepo.model, executor: UserRepo.model, config: Config,
+                                  bot: Bot):
+    history_start_msg = (
+        '==============================\n'
+        f'УГОДУ РОЗПОЧАТО В ЧАТІ {room.chat_id}\n'
+        f'Замовник: {customer.mention}\n'
+        f'Виконавець: {executor.mention}\n'
+        f'🆔 #Угода_номер_{deal.deal_id}\n'
+        f'=============================='
+    )
+    history_end_msg = (
+        '==============================\n'
+        'УГОДУ ЗАВЕРШЕНО\n'
+        f'🆔 #Угода_номер_{deal.deal_id}\n'
+        f'=============================='
+    )
+    await bot.send_message(config.misc.media_channel_chat_id, history_start_msg)
+    messages = await userbot.get_chat_history(room.chat_id)
+    chat_users = [customer.user_id, executor.user_id]
+    for message in messages:
+        try:
+            client = userbot._client
+            if not message.media:
+                if message.text:
+                    sender_name = f'{message.from_user.mention}: ' if message.from_user.id in chat_users else ''
+                    text = f'{sender_name}{message.text}'
+                    await client.send_message(
+                        config.misc.media_channel_chat_id, text
+                    )
+            else:
+                await userbot._client.copy_message(config.misc.media_channel_chat_id, room.chat_id, message.id)
+        except:
+            pass
+    await bot.send_message(config.misc.media_channel_chat_id, history_end_msg)
+    await userbot.delete_group(room.chat_id)

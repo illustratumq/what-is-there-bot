@@ -6,7 +6,7 @@ from pyrogram.errors import ChatIdInvalid
 from pyrogram.raw.core import TLObject
 from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
 from pyrogram.raw.types import ChatAdminRights
-from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember
+from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember, Message
 
 from app.config import UserBot
 from app.misc.media import make_chat_photo_template
@@ -41,11 +41,20 @@ class UserbotController:
             members.append(member.user.id)
         return members
 
+    async def get_chat_history(self, chat_id: int) -> list[Message]:
+        await self.connect()
+        client = self._client
+        history = client.get_chat_history(chat_id=chat_id)
+        messages = []
+        async for msg in history:
+            messages.append(msg)
+        return messages[::-1]
+
     async def create_new_room(self, last_room_number: int) -> tuple[Chat, ChatInviteLink, str]:
-        '''
+        """
         :param last_room_number: room_id of last created room
         :return: chat, invite_link, room_name
-        '''
+        """
         await self.connect()
         client = self._client
         chat, room_name = await self._create_group(client, last_room_number)
@@ -101,10 +110,12 @@ class UserbotController:
         await self.connect()
         await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=now() + timedelta(seconds=5))
 
-    async def _delete_group(self, client: Client, chat: Chat) -> None:
-        raw = DeleteChat(chat_id=chat.id)
+    async def delete_group(self, chat_id: int) -> None:
+        await self.connect()
+        client = self._client
+        raw = DeleteChat(chat_id=chat_id)
         try:
             await self._invoke(client, raw)
         except ChatIdInvalid:
-            raw.chat_id = -chat.id
+            raw.chat_id = -chat_id
             await self._invoke(client, raw)

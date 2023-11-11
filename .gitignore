@@ -21,4 +21,5 @@ __pycache__/
 redisdata/
 pgdata/
 pyrightconfig.json
+app/handlers/tests
 

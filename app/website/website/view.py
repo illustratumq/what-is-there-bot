@@ -5,9 +5,6 @@ class CustomAdminView(View):
     template_name = "test.html"  # Вказуємо шлях до шаблону
 
     def get(self, request):
-        print(
-            '\n\n',  request, '\n\n'
-        )
         # Тут ви можете зробити обчислення або отримати дані для відображення на сторінці
         context = {
             'data': 'Це ваші дані для відображення на сторінці',
