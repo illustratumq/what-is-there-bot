@@ -2,7 +2,8 @@
 
 class Menu:
     to_markers: str = '◀ До сповіщень'
-    letter: str = 'Повідомлення ✉️'
+    letter: str = 'Повідомлення  📭️'
+    new_letter: str = 'Повідомлення 📬'
     markers: str = 'Підписки 📚'
     work_times: str = 'Час роботи ⏱'
     new_marker: str = 'Додати'
@@ -20,10 +21,6 @@ class Menu:
     admin: str = '🔁 В адмін-панель'
     back: str = '◀ Назад'
 
-    @staticmethod
-    def new_letter(n):
-        return f'Повідомлення 📩 ({n})'
-
 
 class Action:
     cancel: str = 'Відмінити'
@@ -36,13 +33,15 @@ class DealAdmin:
     refuse_chat: str = 'Відмовитися'
     done_deal: str = 'Завершити угоду'
     cancel_deal: str = 'Відмінити угоду'
-    ban_user: str = '🔒 Блокувати користувача'
     restrict_user: str = '🔐 Обмежити користувача'
     customer: str = 'Замовник'
     executor: str = 'Виконавець'
     close: str = 'Закрити'
     confirm: str = 'Так, я на 100% впевнений'
     back: str = '◀ Назад'
+
+    def ban_user(self, banned: bool = False):
+        return  '🔓 Розблокувати' if banned else '🔒 Блокувати'
 
 
 class Deal:
@@ -129,10 +128,10 @@ class Statistic:
     date: str = 'Період 🗓'
 
 class Admin:
-    statistic = 'Статистика 📊'
     statistic_menu = Statistic()
     post = AdminPost()
     commission_edit = Commission()
+    statistic = 'Статистика 📊'
     commission: str = '💵 Комісія'
     setting: str = '⚙ Налаштування'
     user: str = '🗂 Юзери'
@@ -141,7 +140,8 @@ class Admin:
     cancel: str = 'Відмінити'
     to_admin: str = '◀ В адмін панель'
     to_packs: str = '◀ До пакунків'
-    user_detail: str = 'Переглянути всю інформацію'
+    user_detail: str = '📇 Вся інформація'
+    user_server: str = '↗️ Адмін панель'
 
 
 class Buttons:

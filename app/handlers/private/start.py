@@ -49,7 +49,7 @@ async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo, letter_d
         user = await user_db.get_user(msg.from_user.id)
         text = greeting_text.format('ENTER_help') if msg.text != Buttons.menu.back else 'Ви повернулись в головне меню'
         await msg.answer(text, reply_markup=menu_kb(admin=user.type == UserTypeEnum.ADMIN,
-                                                    letters=len(new_letters)))
+                                                    letters=bool(new_letters)))
     else:
         await msg.answer(greeting_text.format(bot), reply_markup=menu_kb())
     await state.finish()

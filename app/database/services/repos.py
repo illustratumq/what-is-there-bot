@@ -226,11 +226,7 @@ class LetterRepo(BaseRepo[Letter]):
         return await self.get_all(self.model.user_id == user_id, self.model.read == False)
 
     async def get_all_user_letters(self, user_id: int) -> list[Letter]:
-        letters_new = await self.get_new_letters_user(user_id)
-        letters_old = await self.get_all(self.model.user_id == user_id, self.model.read == True)
-        letters_new.sort(key=lambda l: l.created_at, reverse=True)
-        letters_old.sort(key=lambda l: l.created_at, reverse=True)
-        return letters_new, letters_old
+        return await self.get_all(self.model.user_id == user_id)
 
     async def update_letter(self, letter_id: int, **kwargs) -> None:
         return await self.update(self.model.letter_id == letter_id, **kwargs)
@@ -255,3 +251,16 @@ class JoinRepo(BaseRepo[Join]):
 
     async def delete_join(self, join_id: int):
         return await self.delete(self.model.join_id == join_id)
+
+
+class AdminSettingRepo(BaseRepo[AdminSetting]):
+    model = AdminSetting
+
+    async def get_setting(self, setting_id: int) -> AdminSetting:
+        return await self.get_one(self.model.setting_id == setting_id)
+
+    async def update_setting(self, setting_id: int, **kwargs) -> None:
+        return await self.update(self.model.setting_id == setting_id, **kwargs)
+
+    async def delete_join(self, setting_id: int):
+        return await self.delete(self.model.setting_id == setting_id)

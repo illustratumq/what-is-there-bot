@@ -3,52 +3,61 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, CallbackQuery
 
 from app.config import Config
-from app.database.services.repos import UserRepo, DealRepo, PostRepo
+from app.database.services.enums import UserStatusEnum
+from app.database.services.repos import UserRepo, DealRepo, PostRepo, SettingRepo
 from app.keyboards import Buttons
-from app.keyboards.inline.admin import user_info_kb, user_search_cb
+from app.keyboards.inline.admin import user_info_kb, user_search_cb, user_full_settings_kb
+from app.keyboards.inline.back import back_kb
 from app.keyboards.reply.menu import basic_kb
 
 
-async def search_user_cmd(msg: Message, state: FSMContext):
+async def search_user_cmd(msg: Message, state: FSMContext, config: Config):
+    admin_channel = await msg.bot.get_chat(config.misc.admin_channel_id)
     text = (
-        'Для того щоб знайти користувача, використайте будь-який з наступних методів пошуку:\n\n'
-        '1. Перешліть повідомлення від користувача\n'
-        '2. Перешліть пост з адмін каналу, в якому брав участь цей користувач\n'
-        '3. Напишіть номер угоди цілим числом, в якій брав участь цей користувач\n'
-        '4. Напишіть повне або частину ім\'я користувача (мінімум 2 літери)'
+        '🔍 Для того щоб знайти користувача, використайте будь-який з наступних методів пошуку:\n\n'
+        '1) Перешліть повідомлення від користувача\n'
+        f'2) Перешліть пост з <a href="{admin_channel.invite_link}">адмін каналу</a>, '
+        f'в якому брав участь цей користувач\n'
+        '3) Напишіть номер угоди цілим числом, в якій брав участь цей користувач\n'
+        '4) Напишіть повне або частину ім\'я користувача (мінімум 2 літери)'
     )
-    await msg.answer(text)
+    await msg.answer(text, reply_markup=basic_kb([Buttons.admin.to_admin]), disable_web_page_preview=True)
     await state.set_state(state='admin_search')
 
 
-async def send_user_info(msg: Message, user: UserRepo.model, state: FSMContext):
+async def send_user_info(msg: Message, user: UserRepo.model):
     await msg.answer(f'Знайдено користувача {user.create_html_link(user.full_name)}',
-                     reply_markup=user_info_kb(user.user_id))
-    await state.finish()
+                     reply_markup=user_info_kb(user))
 
 
-async def detail_user_info(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
-                           config: Config):
+async def detail_user_info(upd: CallbackQuery | Message, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
+                           setting_db: SettingRepo, state: FSMContext):
     user = await user_db.get_user(int(callback_data['user_id']))
+    status = {
+        UserStatusEnum.ACTIVE: '🟢 Активний',
+        UserStatusEnum.BANNED: '🔴 Забанений'
+    }
     text = (
         f'Повне ім\'я: {user.create_html_link(user.full_name)}\n'
-        f'ТелеграмID: {user.user_id}\n'
+        f'ТелеграмID: <code>{user.user_id}</code>\n'
         f'Баланс: {user.balance} грн.\n'
-        f'Статус: {user.status}\n'
+        f'Статус: {status[user.status]}\n'
     )
     deals_executor = await deal_db.get_deal_executor(user.user_id, '*')
     deals_customer = await deal_db.get_deal_customer(user.user_id, '*')
-
-    user_url = 'http://' + config.misc.server_host_ip + f':8000/admin/whatistherebot/user/{user.user_id}/change/'
+    rating = (await deal_db.calculate_user_rating(user.user_id))[0]
+    setting = await setting_db.get_setting(user.user_id)
 
     text += (
         '\nАктивність:\n\n'
+        f'Рейтинг: {rating} {user.emojize_rating_text(rating)}\n'
         f'В ролі замовника: {len(deals_customer)} угод\n'
         f'В ролі виконавця: {len(deals_executor)} угод\n\n'
-        f'{user_url}'
     )
-    await call.message.edit_text(text, reply_markup=user_info_kb(user.user_id))
-
+    if isinstance(upd, CallbackQuery):
+        await upd.message.edit_text(text, reply_markup=user_full_settings_kb(setting, user))
+    else:
+        await upd.answer(text, reply_markup=user_full_settings_kb(setting, user))
 
 async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRepo,
                                post_db: PostRepo, state: FSMContext):
@@ -88,10 +97,12 @@ async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRep
         else:
             if len(msg.text) >= 2:
                 users = []
+
                 for user in await user_db.get_all():
-                    if user.full_name.lower() == msg.text.lower() and msg.text[-1] != '+':
-                        await send_user_info(msg, user, state)
-                        await msg.answer(f'Щоб побачити інші результати введіть <code>"{msg.text}+"</code>')
+                    msg_input = msg.text.lower().replace(f'#{user.user_id}', '')
+                    if user.full_name.lower() == msg_input and msg.text[-1] != '+':
+                        await send_user_info(msg, user)
+                        await msg.answer(f'Щоб побачити інші результати введіть <code>{msg_input}+</code>')
                         return
                     if user.full_name.lower().replace('+', '').startswith(msg.text.lower()):
                         users.append(user)
@@ -99,7 +110,8 @@ async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRep
                         users.append(user)
                 if users:
                     text = f'Знайдено {len(users)} користувачів із текстовим збігом "{msg.text}":\n\n'
-                    text += ', '.join([f'<code>{user.full_name}</code>' for user in users])
+                    for user, n in zip(users, range(len(users))):
+                        text += f'{n+1}. <code>{user.full_name}#{user.user_id}</code>'
                     await msg.answer(text)
                     return
             else:

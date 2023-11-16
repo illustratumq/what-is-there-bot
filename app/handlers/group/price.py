@@ -25,8 +25,8 @@ async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: Deal
     executor = await user_db.get_user(deal.executor_id)
     commission = await commission_db.get_commission(customer.commission_id)
     text = (
-        f'Щоб встановити ціну угоди, {customer.create_html_link(customer.full_name)} та '
-        f'{executor.create_html_link(executor.full_name)} повинні відправити одне й те саме ціле число. '
+        f'Щоб встановити ціну угоди, {customer.full_name} та '
+        f'{executor.full_name} повинні відправити одне й те саме ціле число. '
         f'Мінімальна ціна — {commission.minimal} грн.\n\n'
         f'ℹ В нашому сервісі встановлена комісія, з якою Ви можете ознайомитись за посиланням.'
     )

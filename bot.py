@@ -15,10 +15,11 @@ from app.fondy.api import FondyApiWrapper
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
-from app.misc.pirce import setup_default_commission_pack
+from app.misc.setup import *
 from app.misc.scheduler import compose_scheduler
 
 log = logging.getLogger(__name__)
+logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
 
 
 async def set_bot_commands(bot: Bot) -> None:
@@ -65,11 +66,12 @@ async def main():
 
     await set_bot_commands(bot)
     await setup_default_commission_pack(sqlalchemy_session)
+    await setup_default_admin_settings(sqlalchemy_session)
     await notify_admin(bot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
 
-
     try:
+        await userbot.connect()
         scheduler.start()
         await dp.skip_updates()
         await dp.start_polling(allowed_updates=allowed_updates, reset_webhook=True)

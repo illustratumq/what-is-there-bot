@@ -1,12 +1,12 @@
 from app.keyboards.reply.base import *
 
 
-def menu_kb(admin: bool = False, letters: int = 0):
+def menu_kb(admin: bool = False, letters: bool = False):
     keyboard = [
         [KeyboardButton(Buttons.menu.new_post), KeyboardButton(Buttons.menu.new_deal)],
         [KeyboardButton(Buttons.menu.my_posts), KeyboardButton(Buttons.menu.my_money)],
         [KeyboardButton(Buttons.menu.my_rating), KeyboardButton(Buttons.menu.my_chats)],
-        [KeyboardButton(Buttons.menu.letter if letters == 0 else Buttons.menu.new_letter(letters)),
+        [KeyboardButton(Buttons.menu.new_letter if letters else Buttons.menu.letter),
          KeyboardButton(Buttons.menu.notifications)]
     ]
 

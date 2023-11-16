@@ -88,7 +88,7 @@ async def user_comments_list(query: InlineQuery, deal_db: DealRepo, user_db: Use
                 )
             )
 
-    await query.answer(results, is_personal=True, cache_time=5)
+    await query.answer(results, is_personal=True)
 
 
 def setup(dp: Dispatcher):

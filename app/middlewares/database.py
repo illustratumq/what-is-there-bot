@@ -27,6 +27,7 @@ class DatabaseMiddleware(LifetimeControllerMiddleware):
         data['marker_db'] = MarkerRepo(session)
         data['letter_db'] = LetterRepo(session)
         data['join_db'] = JoinRepo(session)
+        data['admin_setting_db'] = AdminSettingRepo(session)
         data['session_pool'] = self.session_pool
         data['session'] = session
 

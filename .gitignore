@@ -13,6 +13,7 @@ __pycache__/
 *venv/
 *ENV/
 *VENV/
+*sh/
 
 # IDE
 .idea/

@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputF
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, JoinStatusEnum
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, JoinRepo
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, JoinRepo, LetterRepo
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
@@ -153,7 +153,7 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
 async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: PostRepo.model, customer: UserRepo.model,
                                executor: UserRepo.model,  state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
                                user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
-                               userbot: UserbotController, config: Config):
+                               letter_db: LetterRepo, userbot: UserbotController, config: Config):
     await call.message.delete_reply_markup()
     if deal.price == 0:
         text = (
@@ -238,9 +238,14 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
             else:
                 await deal_db.update_deal(deal.deal_id, customer_id=None)
 
+        letter_executor = (
+            f'Ви закінчили угоду "{post.title}", вам нараховано {deal.price - commission_for_executor} грн.'
+        )
+        await letter_db.add(user_id=executor.user_id, text=letter_executor)
         await copy_and_delete_history(userbot, room, deal, customer, executor, config, call.bot)
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
-        await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
+        if join:
+            await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                                   message_id=None)
         await deal_db.update_deal(deal.deal_id, commission=full_commission, chat_id=None)
@@ -250,7 +255,8 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, post: 
 
 async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
                                    post_db: PostRepo, state: FSMContext, room_db: RoomRepo, join_db: JoinRepo,
-                                   commission_db: CommissionRepo, userbot: UserbotController, config: Config):
+                                   commission_db: CommissionRepo, userbot: UserbotController, config: Config,
+                                   letter_db: LetterRepo):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
@@ -261,7 +267,7 @@ async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, dea
     if customer_data['voted'] and executor_data['voted']:
         post = await post_db.get_post(deal.post_id)
         await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db, room_db,
-                                   commission_db, join_db, userbot, config)
+                                   commission_db, join_db, letter_db, userbot, config)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')

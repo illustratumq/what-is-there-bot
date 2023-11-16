@@ -82,7 +82,8 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
     if deal.type == DealTypeEnum.PUBLIC:
         message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
     await cjr.chat.pin_message(message_id=message.message_id)
-    await cjr.bot.copy_message(cjr.chat.id, config.misc.media_channel_chat_id, post.media_id)
+    if post.media_id:
+        await cjr.bot.copy_message(cjr.chat.id, config.misc.media_channel_chat_id, post.media_id)
     text = (
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'

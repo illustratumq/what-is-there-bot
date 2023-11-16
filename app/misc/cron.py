@@ -70,9 +70,9 @@ log = logging.getLogger(__name__)
 
 
 def setup_cron_function(scheduler: ContextSchedulerDecorator):
-    #scheduler.add_job(
-    #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
-    #)
+    scheduler.add_job(
+       func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
+    )
     scheduler.add_job(
         func=checkout_payments, trigger='interval', seconds=30, name='Перевірка платіжок'
     )
@@ -148,10 +148,11 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
 
 async def send_database(session: sessionmaker, bot: Bot, config: Config):
     db = database(session)
-    path = await save_database(db.user_db, db.deal_db, db.post_db, db.room_db)
+    path = await save_database(db.user_db, db.deal_db, db.post_db, db.room_db, db.commission_db,
+                               db.join_db, db.setting_db, db.order_db, db.marker_db)
     await bot.send_document(chat_id=config.misc.database_channel_id, document=InputFile(path))
     os.remove(path)
     path = await save_database_json(db.user_db, db.deal_db, db.post_db, db.room_db, db.commission_db,
-                                    db.marker_db, db.setting_db)
+                                    db.join_db, db.setting_db, db.order_db, db.marker_db)
     await bot.send_document(chat_id=config.misc.database_channel_id, document=InputFile(path))
     os.remove(path)

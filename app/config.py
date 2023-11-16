@@ -51,7 +51,6 @@ class UserBot:
 @dataclass
 class Miscellaneous:
     log_level: int
-    server_host_ip: str
     media_channel_chat_id: int
     post_channel_chat_id: int
     admin_help_channel_id: int
@@ -62,6 +61,21 @@ class Miscellaneous:
     chat_activity_period: int
     timezone: str
 
+@dataclass
+class Django:
+    server_host_ip: int
+    django_site_port: int
+    login: str
+    password: str
+
+    @property
+    def base_link(self):
+        return f'http://{self.server_host_ip}:{self.django_site_port}/admin/'
+
+    def model_link(self, name: str, model_id: int):
+        return self.base_link + '/'.join([
+            'whatistherebot', name, str(model_id), 'change'
+        ])
 
 @dataclass
 class Config:
@@ -70,6 +84,7 @@ class Config:
     redis: RedisConfig
     misc: Miscellaneous
     userbot: UserBot
+    django: Django
 
     @classmethod
     def from_env(cls, path: str = None) -> 'Config':
@@ -104,7 +119,6 @@ class Config:
                 admin_help_channel_id=env.int('ADMIN_HELP_CHANNEL_ID'),
                 reserv_channel_id=env.int('RESERV_CHANNEL_ID'),
                 timezone=env.str('TIMEZONE'),
-                server_host_ip=env.str('SERVER_HOST_IP'),
                 database_channel_id=env.str('DATABASE_CHANNEL_ID'),
                 chat_activity_period=env.int('CHAT_ACTIVITY_PERIOD'),
                 history_channel_id=env.int('HISTORY_CHANNEL_ID')
@@ -113,5 +127,11 @@ class Config:
                 api_id=env.str('USERBOT_API_ID', None),
                 api_hash=env.str('USERBOT_API_HASH', None),
                 session_name=env.str('USERBOT_SESSION_NAME', 'userbot'),
+            ),
+            django=Django(
+                server_host_ip=env.str('SERVER_HOST_ID', '127.0.0.1'),
+                django_site_port=env.str('DJANGO_SITE_PORT', '8000'),
+                login=env.str('DJANGO_SUPERUSER_USERNAME'),
+                password=env.str('DJANGO_SUPERUSER_PASSWORD')
             )
         )

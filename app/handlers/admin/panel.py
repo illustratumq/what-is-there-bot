@@ -1,11 +1,12 @@
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
-from aiogram.types import Message, ChatType
+from aiogram.types import Message, ChatType, CallbackQuery
 
 from app.config import Config
-from app.database.services.repos import CommissionRepo, UserRepo
+from app.database.services.repos import CommissionRepo, UserRepo, AdminSettingRepo
 from app.filters import IsAdminFilter
+from app.keyboards.inline.admin import admin_setting_kb, admin_setting_cb
 from app.keyboards.reply.admin import admin_kb, Buttons, construct_packs_kb, keyboard_constructor, edit_commission_kb
 from app.states.states import CommissionAdminSG
 
@@ -18,10 +19,24 @@ async def admin_cmd(msg: Message, state: FSMContext, config: Config):
     await state.finish()
     text = (
         'Ви перейшли в адмін панель\n\n'
-        'Сайт: http://' + config.misc.server_host_ip + ':8000/admin'
+        f'Веб адмінка: {config.django.base_link}\n'
+        f'Логін: <code>{config.django.login}</code>\n'
+        f'Пароль: <code>{config.django.password}</code>'
     )
     await msg.answer(text, reply_markup=admin_kb())
 
+async def setting_cmd(upd: Message | CallbackQuery, admin_setting_db: AdminSettingRepo):
+    settings = await admin_setting_db.get_all()
+    kwargs = dict(text='Налаштування', reply_markup=admin_setting_kb(settings))
+    if isinstance(upd, Message):
+        await upd.answer(**kwargs)
+    else:
+        await upd.message.edit_text(**kwargs)
+
+async def setting_update_cmd(call: CallbackQuery, callback_data: dict, admin_setting_db: AdminSettingRepo):
+    setting = await admin_setting_db.get_setting(int(callback_data['setting_id']))
+    await admin_setting_db.update_setting(setting.setting_id, setting_status=False if setting.setting_status else True)
+    await setting_cmd(call, admin_setting_db)
 
 async def commission_cmd(msg: Message, commission_db: CommissionRepo):
     packs = await commission_db.get_all()
@@ -123,11 +138,13 @@ def setup(dp: Dispatcher):
     #  Main handlers
     dp.register_message_handler(admin_cmd, *filters, state='*', text=(Buttons.menu.admin, Buttons.admin.to_admin))
     dp.register_message_handler(commission_cmd, *filters, state='*', text=Buttons.admin.commission)
+    dp.register_message_handler(setting_cmd, text=Buttons.admin.setting, state='*')
     dp.register_message_handler(select_commission_pack, *filters, state=CommissionAdminSG.Select)
     dp.register_message_handler(edit_commission, *filters, state=CommissionAdminSG.Edit, text=Buttons.admin.edit)
     dp.register_message_handler(input_parameter, *filters, state=CommissionAdminSG.Parameter)
     dp.register_message_handler(save_parameter, *filters, state=CommissionAdminSG.Save)
 
+    dp.register_callback_query_handler(setting_update_cmd, admin_setting_cb.filter(), state='*')
 
 def construct_commission_info(commissions: list[CommissionRepo.model]):
     text = ''

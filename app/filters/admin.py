@@ -16,11 +16,6 @@ class IsAdminFilter(BoundFilter):
         return False if not user else user.type == UserTypeEnum.ADMIN
 
 
-class LetterFilter(BoundFilter):
-    async def check(self, msg: Message, *args: ...) -> bool:
-        return 'Повідомлення 📩 (' in msg.text
-
-
 class CommentFilter(BoundFilter):
     async def check(self, query: InlineQuery, *args: ...) -> bool:
         return 'відгуки@' in query.query

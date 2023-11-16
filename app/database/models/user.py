@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 
+from app.config import Config
 from app.database.models.base import TimedBaseModel
 from app.database.services.enums import UserStatusEnum, UserTypeEnum
 
@@ -51,15 +52,14 @@ class User(TimedBaseModel):
         text = (
             f'Ваш рейтинг: {rating} {self.emojize_rating_text(rating)}\n'
             f'Кількість ваших виконаних угод: {deals}\n'
-            f'Кількість угод які оцінили: {evaluated}\n'
-            f'Про себе: {self.description if self.description else "Немає опису"}\n\n'
-            f'ℹ Рейтинг рахується тільки для оцінених угод. Неоцінені угоди не впливають на рейтинг.\n\n'
+            f'Кількість угод які оцінили: {evaluated}\n\n'
+            f'💬 Про себе: '
         )
-        if not self.description:
-            text += (
-                'Ви також можете додати короткий опис в розділі "Про себе", який замовник побачить '
-                'у вашому запиті на виконання завдання.'
-            )
+        if self.description:
+            text += f'\n\n<pre>{self.description}</pre>' + '\n\n'
+        else:
+            text += 'Додай короткий опис, який замовник побачить у твоєму запиті на виконання завдання.\n\n'
+        text += f'ℹ Рейтинг рахується тільки для оцінених угод. Неоцінені угоди не впливають на рейтинг.\n\n'
         return text
 
     def construct_user_status(self):
@@ -74,3 +74,7 @@ class User(TimedBaseModel):
 
     def create_html_link(self, text: str):
         return f'<a href="tg://user?id={self.user_id}">{text}</a>'
+
+    def server_url(self):
+        config = Config.from_env()
+        return config.django.model_link('user', self.user_id)

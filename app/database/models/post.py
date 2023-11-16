@@ -80,4 +80,4 @@ class Post(TimedBaseModel):
     @property
     def server_url(self):
         config = Config.from_env()
-        return f'http://{config.misc.server_host_ip}:8000/admin/whatistherebot/post/{self.post_id}/change/'
+        return config.django.model_link('post', self.post_id)

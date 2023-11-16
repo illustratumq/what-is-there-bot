@@ -5,10 +5,12 @@ from aiogram.types import CallbackQuery, ChatType, Message
 
 from app.config import Config
 from app.database.services.enums import UserStatusEnum
-from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo, CommissionRepo, SettingRepo, JoinRepo
+from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo, CommissionRepo, SettingRepo, JoinRepo, \
+    LetterRepo
+from app.handlers.admin.users import detail_user_info
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.admin import admin_command_kb, admin_confirm_kb, admin_room_cb, admin_choose_user_kb, \
-    user_setting_kb, user_setting_cb
+    user_setting_kb, user_setting_cb, user_full_setting_cb
 from app.handlers.group.cancel import cancel_deal_processing, done_deal_processing
 from app.states.states import UserBanSG
 
@@ -69,7 +71,8 @@ async def done_deal_confirm(call: CallbackQuery, callback_data: dict, user_db: U
 
 async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
                           room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo,
-                          state: FSMContext, userbot: UserbotController, config: Config, join_db: JoinRepo):
+                          state: FSMContext, userbot: UserbotController, config: Config, join_db: JoinRepo,
+                          letter_db: LetterRepo):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
     room = await room_db.get_room(deal.chat_id)
     admin = await user_db.get_user(call.from_user.id)
@@ -93,7 +96,7 @@ async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: Use
     await call.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
     await call.message.answer(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно завершена!')
     await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db,
-                               room_db, commission_db, join_db, userbot, config)
+                               room_db, commission_db, join_db, letter_db, userbot, config)
 
 async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
                             room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo, state: FSMContext,
@@ -140,23 +143,39 @@ async def edit_user_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealR
         f'Роль в цій угоді: {role}\n'
         f'{await user.construct_admin_info(deal_db)}'
     )
-    await call.message.edit_text(text, reply_markup=user_setting_kb(deal, setting))
+    await call.message.edit_text(text, reply_markup=user_setting_kb(deal, setting, user))
 
 
 async def edit_user_setting(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                            setting_db: SettingRepo, state: FSMContext):
+                            setting_db: SettingRepo, state: FSMContext, config: Config):
     user_id = int(callback_data['user_id'])
     setting = await setting_db.get_setting(user_id)
     if callback_data['action'] == 'ban_user':
-        await user_db.update_user(user_id, status=UserStatusEnum.BANNED, ban_comment='Причина не вказана')
-        text = (
-            'Будь-ласка, вкажіть причину, за якою '
-            'користувач був забанений (до 400 символів)'
-        )
-        message = await call.message.answer(text)
-        await state.update_data(user_id=user_id, last_msg_id=message.message_id, origin_id=call.message.message_id,
-                                deal_id=int(callback_data['deal_id']))
-        await UserBanSG.Input.set()
+        user = await user_db.get_user(user_id)
+        if user.status == UserStatusEnum.BANNED:
+            await user_db.update_user(user_id, status=UserStatusEnum.ACTIVE, ban_comment='')
+            await call.answer(f'{user.full_name} розбанено.', show_alert=True)
+        else:
+            if user.user_id == call.from_user.id:
+                await call.answer('Ви не можете забанити себе', show_alert=True)
+                return
+            await user_db.update_user(user_id, status=UserStatusEnum.BANNED, ban_comment='Причина не вказана')
+            text = (
+                'Будь-ласка, вкажіть причину, за якою '
+                'користувач був забанений (до 400 символів)'
+            )
+            message = await call.message.answer(text)
+            ufst = callback_data['@'] == 'ufst'
+            kwargs = dict(
+                user_id=user_id, last_msg_id=message.message_id, origin_id=call.message.message_id,
+                ufst=ufst
+            )
+            if ufst:
+                await state.update_data(**kwargs)
+            else:
+                kwargs.update(dict(deal_id=int(callback_data['deal_id'])))
+                await state.update_data(**kwargs)
+            await UserBanSG.Input.set()
     elif callback_data['action'] == 'can_be_customer':
         await setting_db.update_setting(user_id, can_be_customer=not setting.can_be_customer)
     elif callback_data['action'] == 'can_be_executor':
@@ -165,12 +184,14 @@ async def edit_user_setting(call: CallbackQuery, callback_data: dict, deal_db: D
         await setting_db.update_setting(user_id, can_publish_post=not setting.can_publish_post)
     elif callback_data['action'] == 'need_check_post':
         await setting_db.update_setting(user_id, need_check_post=not setting.need_check_post)
-
-    await edit_user_cmd(call, callback_data, deal_db, user_db, setting_db)
+    if callback_data['@'] == 'ufst':
+        await detail_user_info(call, callback_data, user_db, deal_db, setting_db, state)
+    else:
+        await edit_user_cmd(call, callback_data, deal_db, user_db, setting_db)
 
 
 async def save_user_ban_comment(msg: Message, state: FSMContext, user_db: UserRepo, deal_db: DealRepo,
-                                setting_db: SettingRepo):
+                                setting_db: SettingRepo, config: Config):
     await msg.delete()
     data = await state.get_data()
 
@@ -189,6 +210,9 @@ async def save_user_ban_comment(msg: Message, state: FSMContext, user_db: UserRe
     else:
         await user_db.update_user(user_id, ban_comment=ban_comment)
         await msg.bot.delete_message(msg.from_user.id, last_msg_id)
+        if data['ufst']:
+            await detail_user_info(msg, {'user_id': user_id}, user_db, deal_db, setting_db, state)
+            return
         user = await user_db.get_user(user_id)
         deal = await deal_db.get_deal(data['deal_id'])
         setting = await setting_db.get_setting(user_id)
@@ -196,7 +220,8 @@ async def save_user_ban_comment(msg: Message, state: FSMContext, user_db: UserRe
             f'Ім\'я: {user.mention} ({user.user_id})\n'
             f'{await user.construct_admin_info(deal_db)}'
         )
-        await msg.bot.edit_message_text(text, msg.from_user.id, origin_id, reply_markup=user_setting_kb(deal, setting))
+        await msg.bot.edit_message_text(text, msg.from_user.id, origin_id, reply_markup=user_setting_kb(deal, setting,
+                                                                                                        user))
         await state.finish()
 
 
@@ -223,6 +248,8 @@ def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
         edit_user_cmd, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='restrict_executor'), state='*')
 
+    dp.register_callback_query_handler(
+        edit_user_setting, ChatTypeFilter(ChatType.PRIVATE), user_full_setting_cb.filter(), state='*')
     dp.register_callback_query_handler(
         edit_user_setting, ChatTypeFilter(ChatType.PRIVATE), user_setting_cb.filter(), state='*')
 

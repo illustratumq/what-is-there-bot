@@ -9,21 +9,32 @@ from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import Message, InputFile, ChatType
 
 from app.database.services.enums import *
-from app.database.services.repos import UserRepo, DealRepo, PostRepo, RoomRepo, CommissionRepo, MarkerRepo, SettingRepo
+from app.database.services.repos import *
 from app.misc.times import now
 
 
 async def save_database(user_db: UserRepo, deal_db: DealRepo, post_db: PostRepo,
-                        room_db: RoomRepo):
+                        room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
+                        setting_db: SettingRepo, order_db: OrderRepo, marker_db: MarkerRepo):
 
     users = await user_db.get_all()
     deals = await deal_db.get_all()
     posts = await post_db.get_all()
     rooms = await room_db.get_all()
+    commissions = await commission_db.get_all()
+    joins = await join_db.get_all()
+    settings = await setting_db.get_all()
+    orders = await order_db.get_all()
+    markers = await marker_db.get_all()
 
-    users_data, deals_data, posts_data, rooms_data = {}, {}, {}, {}
+    (users_data, deals_data, posts_data,
+     rooms_data, commissions_data, joins_data,
+     settings_data, orders_data, markers_data) = {}, {}, {}, {}, {}, {}, {}, {}, {}
 
-    for selection, selection_data in zip([users, deals, posts, rooms], [users_data, deals_data, posts_data, rooms_data]):
+    for selection, selection_data in zip(
+            [users, deals, posts, rooms, commissions, joins, settings, orders, markers],
+            [users_data, deals_data, posts_data, rooms_data, commissions_data, joins_data,
+             settings_data, orders_data, markers_data]):
 
         selection_data.update({
             'created_at': [], 'updated_at': []
@@ -51,9 +62,12 @@ async def save_database(user_db: UserRepo, deal_db: DealRepo, post_db: PostRepo,
 
     with pd.ExcelWriter(path, engine='openpyxl') as writer:
 
-        selection_data_names = ['Користувачі', 'Угоди', 'Пости', 'Кімнати']
+        selection_data_names = ['users_data', 'deals_data', 'posts_data', 'rooms_data', 'commissions_data',
+                                'joins_data', 'settings_data', 'orders_data', 'markers_data']
 
-        for selection_data, i in zip([users_data, deals_data, posts_data, rooms_data], range(len(selection_data_names))):
+        for selection_data, i in zip([users_data, deals_data, posts_data, rooms_data, commissions_data,
+                                      joins_data, settings_data, orders_data, markers_data],
+                                     range(len(selection_data_names))):
             pd.DataFrame(selection_data).to_excel(writer, sheet_name=selection_data_names[i])
 
     return path
@@ -61,23 +75,35 @@ async def save_database(user_db: UserRepo, deal_db: DealRepo, post_db: PostRepo,
 
 async def save_database_cmd(msg: Message, user_db: UserRepo, deal_db: DealRepo, post_db: PostRepo,
                             room_db: RoomRepo, commission_db: CommissionRepo, marker_db: MarkerRepo,
-                            setting_db: SettingRepo):
-    # path = await save_database(user_db, deal_db, post_db, room_db)
-    path = await save_database_json(user_db, deal_db, post_db, room_db, commission_db,
-                                    marker_db, setting_db)
+                            setting_db: SettingRepo, join_db: JoinRepo, order_db: OrderRepo):
+
+    path = await save_database(user_db, deal_db, post_db, room_db, commission_db, join_db, setting_db, order_db,
+                               marker_db)
+    path = await save_database_json(user_db, deal_db, post_db, room_db, commission_db, join_db, setting_db, order_db,
+                                    marker_db)
     await msg.answer_document(InputFile(path))
     os.remove(path)
 
 async def save_database_json(user_db: UserRepo, deal_db: DealRepo, post_db: PostRepo,
-                             room_db: RoomRepo, commission_db: CommissionRepo, marker_db: MarkerRepo,
-                             setting_db: SettingRepo):
-    names = ['users', 'deals', 'posts', 'rooms', 'commissions', 'markers', 'settings']
-    repos = [user_db, deal_db, post_db, room_db, commission_db, marker_db, setting_db]
+                             room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
+                             setting_db: SettingRepo, oder_db: OrderRepo, marker_db: MarkerRepo):
+    names = ['users', 'deals', 'posts', 'rooms', 'commissions', 'markers', 'settings', 'joins', 'oders']
+    repos = [user_db, deal_db, post_db, room_db, commission_db, marker_db, setting_db, join_db, oder_db]
 
     if not os.path.exists('app/database/archive'):
         os.mkdir('app/database/archive')
 
-    enums = [UserStatusEnum, UserTypeEnum, PostStatusText,  RoomStatusEnum, DealStatusEnum, DealTypeEnum]
+    enums = [
+                UserStatusEnum,
+                UserTypeEnum,
+                PostStatusText,
+                RoomStatusEnum,
+                DealStatusEnum,
+                OrderStatusEnum,
+                OrderTypeEnum,
+                JoinStatusEnum,
+                DealTypeEnum
+    ]
 
     for repo, name in zip(repos, names):
         repo_data = {'models': []}
@@ -101,4 +127,5 @@ async def save_database_json(user_db: UserRepo, deal_db: DealRepo, post_db: Post
     return archive
 
 def setup(dp: Dispatcher):
-    dp.register_message_handler(save_database_cmd, ChatTypeFilter(ChatType.PRIVATE), Command('database'), state='*')
+    dp.register_message_handler(save_database_cmd, ChatTypeFilter(ChatType.PRIVATE),
+                                Command('database'), state='*')

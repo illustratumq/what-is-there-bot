@@ -65,6 +65,7 @@ class UserbotController:
         return chat, invite_link, room_name
 
     async def _create_group(self, client: Client, last_room_number: int) -> tuple[Chat, str]:
+        await self.connect()
         new_room_number = last_room_number + 1
         name = f'Чат №{new_room_number}'
         group = await client.create_group(name, [self._bot_username])

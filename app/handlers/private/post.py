@@ -16,7 +16,7 @@ from app.database.services.repos import PostRepo, DealRepo, CommissionRepo, User
     LetterRepo
 from app.handlers.admin.post import publish_post_base_channel
 from app.keyboards import Buttons
-from app.keyboards.inline.moderate import moderate_post_kb
+from app.keyboards.inline.moderate import moderate_post_kb, after_public_edit_kb
 from app.keyboards.inline.post import participate_kb
 from app.keyboards.reply.menu import basic_kb, menu_kb
 from app.misc.media import make_post_media_template
@@ -35,7 +35,10 @@ async def new_post_title(msg: Message, state: FSMContext, setting_db: SettingRep
         await msg.delete()
         await msg.answer('Адміністрація сервісу заборонила вам бути Замовником')
     else:
-        message = await msg.answer('Напишіть назву предмету або що потрібно зробити', reply_markup=cancel_kb)
+        text = (
+            'Напишіть назву предмету або що потрібно зробити'
+        )
+        message = await msg.answer(text, reply_markup=cancel_kb)
         await state.update_data(last_msg_id=message.message_id, template_media_file=None)
         await PostSG.Title.set()
 
@@ -45,10 +48,13 @@ async def new_post_about(msg: Message, state: FSMContext):
     data = {}
     if await check_is_title_ok(msg, data):
         await state.update_data(title_message_id=msg.message_id)
-        text = 'Максимально докладно опишіть завдання'
+        text = (
+            'Максимально докладно опишіть завдання\n\n'
+            'Порада: Додайте інформацію про термін здачі роботи'
+        )
         await PostSG.About.set()
     else:
-        text = f'Ваша назва предмету повинна містити від 3 до 30 символів (зараз {len(msg.text)})'
+        text = f'Ваша назва завдання повинна містити від 3 до 30 символів (зараз {len(msg.text)})'
     message = await msg.answer(text, reply_markup=cancel_kb)
     await state.update_data(**data, last_msg_id=message.message_id)
 
@@ -80,8 +86,8 @@ async def new_post_media(msg: Message, state: FSMContext, user_db: UserRepo, com
         await state.update_data(last_msg_id=message.message_id)
         return
     text = (
-        f'Надішліть інші матеріали, що стосуються завдання.\n\n'
-        f'Це можуть бути файли або фото. Після закінчення натисніть кнопку <b>{Buttons.action.confirm}</b>'
+        f'Надішліть файли або фото, що стосуються завдання, якщо вони є.'
+        f'Після закінчення натисніть кнопку <b>{Buttons.action.confirm}</b>'
     )
     await msg.answer(text, reply_markup=basic_kb(([Buttons.action.confirm], [Buttons.action.cancel])))
     await PostSG.Media.set()
@@ -132,7 +138,7 @@ async def edit_new_post_data(msg: Message, state: FSMContext, user_db: UserRepo,
     edited_data = {}
     if data['title_message_id'] == edited_message_id:
         if not await check_is_title_ok(msg, edited_data):
-            await msg.answer(f'Ваша назва предмету повинна містити від 3 до 30 символів (зараз {len(msg.text)})')
+            await msg.answer(f'Ваша назва завдання повинна містити від 3 до 30 символів (зараз {len(msg.text)})')
             return
     elif data['about_message_id'] == edited_message_id:
         if not await check_is_about_ok(msg, edited_data):
@@ -156,22 +162,20 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
                            setting_db: SettingRepo, user_db: UserRepo, config: Config,
                            scheduler: ContextSchedulerDecorator, marker_db: MarkerRepo, letter_db: LetterRepo):
     data = await state.get_data()
-    setting = await setting_db.get_setting(msg.from_user.id)
     user = await user_db.get_user(msg.from_user.id)
-
+    setting = await setting_db.get_setting(msg.from_user.id)
     post = await post_db.add(title=data['title'], about=data['about'], price=data['price'], media_id=data['media_id'],
                              media_url=data['media_url'], user_id=msg.from_user.id,)
     deal = await deal_db.add(post_id=post.post_id, customer_id=msg.from_user.id, price=post.price,
                              no_media=data['no_media'])
+    await post_db.update_post(post.post_id, deal_id=deal.deal_id)
     await deal.create_log(deal_db, f'Угода створена з постом #{post.post_id}')
 
+    reply_markup = moderate_post_kb(post)
     if setting.need_check_post or await need_check_post_filter(user, post, deal_db):
-        message = await msg.bot.send_message(config.misc.admin_channel_id,
-                                             post.construct_post_text(use_bot_link=False),
-                                             reply_markup=moderate_post_kb(post))
-        await post_db.update_post(post.post_id, admin_message_id=message.message_id, deal_id=deal.deal_id)
         await msg.answer('Ваш пост відправлений на модерацію 👌', reply_markup=menu_kb())
     else:
+        reply_markup = after_public_edit_kb(post)
         await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
         message = await msg.bot.send_message(
             config.misc.reserv_channel_id, post.construct_post_text(),
@@ -187,6 +191,11 @@ async def publish_post_cmd(msg: Message, state: FSMContext, post_db: PostRepo, d
             name=f'Публікація поста #{post.post_id} на основному каналі'
         )
         await msg.answer('Ваш пост скоро опублікується 👌', reply_markup=menu_kb())
+
+    message = await msg.bot.send_message(config.misc.admin_channel_id,
+                                         post.construct_post_text(use_bot_link=False),
+                                         reply_markup=reply_markup)
+    await post_db.update_post(post.post_id, admin_message_id=message.message_id)
 
     if data['template_media_file']:
         os.remove(data['template_media_file'])

@@ -4,7 +4,7 @@ from app.keyboards.reply.base import *
 def admin_kb():
 
     keyboard = [
-        [KeyboardButton(Buttons.admin.statistic), KeyboardButton(Buttons.admin.commission)],
+        [KeyboardButton(Buttons.admin.statistic), KeyboardButton(Buttons.admin.setting)],
         [KeyboardButton(Buttons.admin.user), KeyboardButton(Buttons.admin.menu)]
     ]
 
