@@ -16,7 +16,7 @@ services:
         #python ./app/website/manage.py createsuperuser --noinput &&
         python ./app/website/manage.py runserver 0.0.0.0:8000&
         python -O bot.py"
-    restart: unless-stopped
+    restart: always
     ports:
       - "8000:8000"
     env_file:
@@ -38,7 +38,7 @@ services:
       - "6377:6379"
     volumes:
       - ./redisdata:/var/lib/redis
-    restart: unless-stopped
+    restart: always
     networks:
       - botnet
 
