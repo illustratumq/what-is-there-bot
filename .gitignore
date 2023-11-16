@@ -6,6 +6,10 @@ __pycache__/
 *.session
 *.rdb
 *.exe
+*.sh
+*.session-journal
+*.jpg
+*.xlsx
 
 # Environments
 .env
@@ -13,7 +17,6 @@ __pycache__/
 *venv/
 *ENV/
 *VENV/
-*sh/
 
 # IDE
 .idea/
