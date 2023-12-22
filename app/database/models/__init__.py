@@ -9,3 +9,4 @@ from app.database.models.order import Order
 from app.database.models.join import Join
 from app.database.models.letter import Letter
 from app.database.models.admin_setting import AdminSetting
+from app.database.models.merchant import Merchant

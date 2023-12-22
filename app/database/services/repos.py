@@ -1,12 +1,7 @@
-from datetime import datetime, timedelta
-
-from sqlalchemy import select, cast
-from sqlalchemy.orm import joinedload
-
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, OrderStatusEnum
-from app.misc.times import now, deltatime, localize
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
+from app.misc.times import now, deltatime
 
 
 class UserRepo(BaseRepo[User]):
@@ -42,29 +37,6 @@ class PostRepo(BaseRepo[Post]):
 
     async def get_post_admin_channel(self, message_id: int) -> Post:
         return await self.get_one(self.model.admin_message_id == message_id)
-
-    async def count_posts(self, date: str, mode: str = '*'):
-        search = []
-        if '-' in date or date in ('month', 'week'):
-            start, end = deltatime(date)
-            search.append(self.model.created_at >= start.date())
-            search.append(self.model.created_at <= end.date())
-        elif date == 'all':
-            pass
-        else:
-            search.append(self.model.created_at >= deltatime(date).date())
-
-        if mode != '*':
-            modes = {
-                'active': self.model.status == DealStatusEnum.ACTIVE,
-                'busy': self.model.status == DealStatusEnum.BUSY,
-                'disable': self.model.status == DealStatusEnum.DISABLES,
-                'moderate': self.model.status == DealStatusEnum.MODERATE,
-                'done': self.model.status == DealStatusEnum.DONE
-            }
-            search.append(modes[mode])
-
-        return await self.count(*search)
 
     async def update_post(self, post_id: int, **kwargs) -> None:
         return await self.update(self.model.post_id == post_id, **kwargs)
@@ -124,6 +96,15 @@ class DealRepo(BaseRepo[Deal]):
     async def delete_deal(self, deal_id: int):
         return await self.delete(self.model.deal_id == deal_id)
 
+
+class MerchantRepo(BaseRepo[Merchant]):
+    model = Merchant
+
+    async def get_merchant(self, merchant_id: int) -> Merchant:
+        return await self.get_one(self.model.merchant_id == merchant_id)
+
+    async def update_merchant(self, merchant_id: int, **kwargs):
+        await self.update(self.model.merchant_id == merchant_id, **kwargs)
 
 class RoomRepo(BaseRepo[Room]):
     model = Room
@@ -185,16 +166,16 @@ class CommissionRepo(BaseRepo[Commission]):
     model = Commission
 
     async def get_commission(self, pack_id: int) -> Commission:
-        return await self.get_one(self.model.pack_id == pack_id)
+        return await self.get_one(self.model.commission_id == pack_id)
 
     async def get_commission_name(self, name: str) -> Commission:
         return await self.get_one(self.model.name == name)
 
     async def update_commission(self, pack_id: int, **kwargs) -> None:
-        return await self.update(self.model.pack_id == pack_id, **kwargs)
+        return await self.update(self.model.commission_id == pack_id, **kwargs)
 
     async def delete_commission(self, pack_id: int):
-        return await self.delete(self.model.pack_id == pack_id)
+        return await self.delete(self.model.commission_id == pack_id)
 
 
 class OrderRepo(BaseRepo[Order]):
@@ -203,11 +184,17 @@ class OrderRepo(BaseRepo[Order]):
     async def get_order(self, order_id: int) -> Order:
         return await self.get_one(self.model.id == order_id)
 
-    async def get_orders_status(self, status: OrderStatusEnum) -> list[Order]:
-        return await self.get_all(self.model.status == status)
+    async def create_log(self, order_id: int, text: str):
+        ordr = await self.get_one(order_id)
+        log = ordr.log if ordr.log else ''
+        new_log = log + f'\n[{now().strftime("%H:%M:%S %d.%m.%y")}]: {text}'
+        await self.update_order(order_id, log=new_log)
 
-    async def get_order_deal(self, deal_id: int) -> Order:
-        return await self.get_one(self.model.deal_id == deal_id)
+    async def get_orders_to_check(self):
+        await self.get_one(self.model.request_body['request'][''])
+
+    async def get_orders_deal(self, deal_id: int) -> list[Order]:
+        return await self.get_all(self.model.deal_id == deal_id)
 
     async def update_order(self, order_id: int, **kwargs) -> None:
         return await self.update(self.model.id == order_id, **kwargs)

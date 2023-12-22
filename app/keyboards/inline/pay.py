@@ -4,7 +4,7 @@ from app.keyboards.inline.base import *
 pay_cb = CallbackData('pay', 'deal_id', 'action')
 
 
-def pay_deal_kb(deal: Deal, balance: bool = False, partially: bool = False):
+def pay_deal_kb(deal: Deal):
 
     def button_cb(action: str):
         return dict(callback_data=pay_cb.new(deal_id=deal.deal_id, action=action))
@@ -14,15 +14,6 @@ def pay_deal_kb(deal: Deal, balance: bool = False, partially: bool = False):
             InlineKeyboardButton(Buttons.pay.pay_deal_fully, **button_cb('pay_fully'))
         ]
     ]
-    if balance:
-        inline_keyboard.insert(
-            0, [InlineKeyboardButton(Buttons.pay.pay_deal_balance, **button_cb('pay_from_balance'))]
-        )
-    elif partially:
-        inline_keyboard.insert(
-            0, [InlineKeyboardButton(Buttons.pay.pay_deal_partially, **button_cb('pay_partially'))]
-        )
-
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 
 

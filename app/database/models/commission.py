@@ -4,30 +4,25 @@ from app.database.models.base import TimedBaseModel
 
 
 class Commission(TimedBaseModel):
-    pack_id = sa.Column(sa.BIGINT, primary_key=True, autoincrement=True)
-    commission = sa.Column(sa.INTEGER, nullable=False, default=5)
-    trigger = sa.Column(sa.INTEGER, nullable=False, default=200)
-    under = sa.Column(sa.INTEGER, nullable=False, default=5)
+    commission_id = sa.Column(sa.BIGINT, primary_key=True, autoincrement=True)
     minimal = sa.Column(sa.INTEGER, nullable=False, default=30)
     maximal = sa.Column(sa.INTEGER, nullable=False, default=15000)
     name = sa.Column(sa.VARCHAR(255), nullable=True)
     description = sa.Column(sa.VARCHAR(500), nullable=True)
+    trigger_price_1 = sa.Column(sa.INTEGER, default=99, nullable=False)
+    trigger_price_2 = sa.Column(sa.INTEGER, default=200, nullable=False)
+    merchant_1 = sa.Column(
+        sa.BIGINT, sa.ForeignKey('merchants.merchant_id', ondelete='SET NULL'), nullable=False)
+    merchant_2 = sa.Column(
+        sa.BIGINT, sa.ForeignKey('merchants.merchant_id', ondelete='SET NULL'), nullable=False)
+    merchant_3 = sa.Column(
+        sa.BIGINT, sa.ForeignKey('merchants.merchant_id', ondelete='SET NULL'), nullable=False)
 
-    def calculate_commission(self, need_to_pay: int):
-
-        if need_to_pay <= self.trigger:
-            return self.under
+    def choose_merchant(self, need_to_pay: int):
+        if need_to_pay <= self.trigger_price_1:
+            return self.merchant_1
+        elif self.trigger_price_1 < need_to_pay <= self.trigger_price_2:
+            return self.merchant_3
         else:
-            return round(need_to_pay * self.commission/100)
+            return self.merchant_3
 
-    def deal_commission(self, deal) -> int:
-        if deal.payed == 0:
-            commission = self.calculate_commission(deal.price)
-        elif deal.price > deal.payed:
-            commission_payed = self.calculate_commission(deal.payed)
-            commission = self.calculate_commission(deal.price) - commission_payed
-        else:
-            commission_payed = self.calculate_commission(deal.payed)
-            commission = self.calculate_commission(deal.price) - commission_payed
-            commission = commission if commission < 0 else 0
-        return commission

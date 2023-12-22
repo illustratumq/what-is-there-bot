@@ -16,8 +16,8 @@ class FondyApiWrapper:
     capture_url = 'https://pay.fondy.eu/api/capture/order_id'
 
     def __init__(self, config: Config):
-        self.merchant_id = config.bot.fondy_merchant_id
-        self.secret_key = config.bot.fondy_credit_key
+        self.merchant_id = config.bot.fondy_merchant_id_1
+        self.secret_key = config.bot.fondy_p2p_key
 
     @staticmethod
     def _generate_signature(*values) -> str:

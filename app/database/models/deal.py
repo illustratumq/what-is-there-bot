@@ -16,7 +16,6 @@ class Deal(TimedBaseModel):
 
     price = sa.Column(sa.INTEGER, default=0, nullable=False)
     payed = sa.Column(sa.INTEGER, default=0, nullable=False)
-    commission = sa.Column(sa.INTEGER, default=0, nullable=False)
     status = sa.Column(ENUM(DealStatusEnum), default=DealStatusEnum.MODERATE, nullable=False)
     type = sa.Column(ENUM(DealTypeEnum), default=DealTypeEnum.PUBLIC, nullable=False)
     rating = sa.Column(sa.INTEGER, nullable=True)
@@ -39,6 +38,8 @@ class Deal(TimedBaseModel):
     def chat_status(self):
         if self.payed >= self.price and self.payed > 0:
             return 'Оплачена'
+        elif self.price > self.payed and self.price > 0:
+            return 'Не доплачена'
         else:
             return 'Неоплачена'
 

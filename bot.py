@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 import aiogram
 import betterlogging as bl
@@ -9,14 +8,14 @@ from aiogram.contrib.fsm_storage.redis import RedisStorage2
 from aiogram.types import ParseMode, AllowedUpdates, BotCommand
 
 from app import handlers, middlewares
-from app.config import Config
 from app.database.services.db_engine import create_db_engine_and_session_pool
-from app.fondy.api import FondyApiWrapper
+from app.fondy.new_api import FondyApiWrapper
+from app.fondy.tests import test
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
-from app.misc.setup import *
 from app.misc.scheduler import compose_scheduler
+from app.misc.setup import *
 
 log = logging.getLogger(__name__)
 logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
@@ -48,9 +47,9 @@ async def main():
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
-    userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat_photo.png')
-    fondy = FondyApiWrapper(config)
-    scheduler = compose_scheduler(config, bot, sqlalchemy_session, None, fondy)
+    userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat.jpg')
+    fondy = FondyApiWrapper(sqlalchemy_session)
+    scheduler = compose_scheduler(config, bot, sqlalchemy_session, userbot, fondy)
 
     allowed_updates = (
             AllowedUpdates.MESSAGE + AllowedUpdates.CALLBACK_QUERY +
@@ -62,10 +61,12 @@ async def main():
     environments = dict(config=config, dp=dp, scheduler=scheduler, fondy=fondy, userbot=userbot)
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
-    setup_cron_function(scheduler)
 
+    await test(sqlalchemy_session)
+    await setup_cron_function(scheduler)
     await set_bot_commands(bot)
-    await setup_default_commission_pack(sqlalchemy_session)
+    await setup_default_merchants(sqlalchemy_session, config)
+    await setup_default_commission_pack(sqlalchemy_session, config)
     await setup_default_admin_settings(sqlalchemy_session)
     await notify_admin(bot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)

@@ -5,17 +5,19 @@ from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import CommandStart, ChatTypeFilter, Command
 from aiogram.types import Message, ChatType
+from aiogram.utils.markdown import hide_link
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, UserTypeEnum, JoinStatusEnum
-from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo, CommissionRepo
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo, OrderRepo, \
+    MerchantRepo
 from app.filters import IsAdminFilter
-from app.handlers.group.price import pay_method_choose
+from app.fondy.new_api import FondyApiWrapper
 from app.handlers.private.room import get_room
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.admin import manage_post_kb
-from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb, join_room_kb
+from app.keyboards.inline.deal import send_deal_kb, add_admin_chat_kb, join_room_kb, to_bot_kb
 from app.keyboards.reply.menu import menu_kb
 from app.states.states import ParticipateSG
 
@@ -209,8 +211,8 @@ async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: D
 
 
 async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo,
-                                 commission_db: CommissionRepo, post_db: PostRepo):
-    await msg.delete()
+                                 order_db: OrderRepo, post_db: PostRepo, merchant_db: MerchantRepo,
+                                 fondy: FondyApiWrapper):
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
@@ -220,7 +222,38 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
         await msg.answer('Ви не є замовником цього завдання')
         return
 
-    await pay_method_choose(msg, deal, customer, post, commission_db)
+    deal = await deal_db.get_deal(deal_id)
+    customer = await user_db.get_user(deal.customer_id)
+    need_to_pay = deal.price - deal.payed
+    orders = await order_db.get_orders_deal(deal_id)
+
+    url = None
+    if orders:
+        for order in orders:
+            if order.request_answer['response']['order_status'] == 'created':
+                merchant = await merchant_db.get_merchant(order.merchant_id)
+                if (await fondy.check_order(order, merchant))['response']['order_status'] == 'created':
+                    if int(order.request_body['amount']/100) != need_to_pay:
+                        await order_db.delete_order(order.id)
+                    else:
+                        url = order.url
+    if not url:
+        response, order = await fondy.create_order(deal, need_to_pay, customer.inn)
+        if response['response']['response_status'] != 'success':
+            await msg.answer(response)
+            return
+        url = response['response']['checkout_url']
+        await order_db.update_order(order.id, url=url)
+
+    text = (
+        f'🧾 Ваш чек на оплату угоди\n\n'
+        f'<b>Навза угоди</b>: {post.title}\n'
+        f'<b>ID угоди</b>: {deal.deal_id}\n'
+        f'<b>Сума сплати без комісії</b>: {need_to_pay} грн.\n\n'
+        f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}'
+    )
+    await msg.answer(text, reply_markup=to_bot_kb(url=url, text='Оплатити'))
+
 
 def setup(dp: Dispatcher):
     dp.register_message_handler(

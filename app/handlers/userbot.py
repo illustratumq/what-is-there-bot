@@ -1,32 +1,38 @@
+import logging
 import os
 from datetime import timedelta
 
-from pyrogram import Client
+import pyrogram
+from aiogram import Bot
+from aiogram.types import ChatPermissions
+from pyrogram import Client, raw, utils, types
 from pyrogram.errors import ChatIdInvalid
 from pyrogram.raw.core import TLObject
 from pyrogram.raw.functions.messages import EditChatAdmin, DeleteChat
-from pyrogram.raw.types import ChatAdminRights
-from pyrogram.types import Chat, ChatInviteLink, ChatPermissions, ChatMember, Message
+from pyrogram.raw.types import ChatAdminRights, InputChannel
+from pyrogram.types import Chat, ChatInviteLink, ChatMember, Message
 
 from app.config import UserBot
 from app.misc.media import make_chat_photo_template
 from app.misc.times import now
 
+log = logging.getLogger(__name__)
 
 class UserbotController:
     def __init__(self, config: UserBot, bot_username: str, chat_photo_path: str):
-        # try:
-        self._client = Client(config.session_name, no_updates=True)
-        # except AttributeError:
-        #     self._client = Client(config.session_name, config.api_id, config.api_hash, no_updates=True)
+        try:
+            self._client = Client(config.session_name, no_updates=True)
+        except:
+            self._client = Client(config.session_name, config.api_id, config.api_hash, no_updates=True)
         self._bot_username = bot_username
         self._chat_photo_path = chat_photo_path
 
     async def connect(self):
         try:
-            await self._client.start()
-        except:
-            pass
+            await self._client.connect()
+            self._client.me = await self._client.get_me()
+        except Exception as Error:
+            log.warning(Error)
 
     async def get_client_user_id(self) -> int:
         await self.connect()
@@ -80,9 +86,8 @@ class UserbotController:
         )
         await client.set_chat_permissions(chat.id, permissions)
 
-    @staticmethod
-    async def _set_chat_photo(chat: Chat, last_room_number: int) -> None:
-        new_photo_path = make_chat_photo_template(last_room_number + 1)
+    async def _set_chat_photo(self, chat: Chat, last_room_number: int) -> None:
+        new_photo_path = make_chat_photo_template(self._chat_photo_path, last_room_number + 1)
         await chat.set_photo(photo=new_photo_path)
         os.remove(new_photo_path)
 
@@ -109,7 +114,10 @@ class UserbotController:
 
     async def kick_chat_member(self, chat_id: int, user_id: int):
         await self.connect()
-        await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=now() + timedelta(seconds=5))
+        until_date = now() + timedelta(seconds=300)
+        await self._client.set_chat_username(chat_id, 'GroupAnonymousBot')
+        # await self._set_chat_permissions(self._client, )
+        # await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=until_date)
 
     async def delete_group(self, chat_id: int) -> None:
         await self.connect()

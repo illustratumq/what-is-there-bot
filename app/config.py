@@ -37,8 +37,12 @@ class TgBot:
     token: str
     admin_ids: tuple[int]
     moder_ids: tuple[int]
-    fondy_credit_key: str
-    fondy_merchant_id: str
+    fondy_secret_key_1: str
+    fondy_secret_key_2: str
+    fondy_secret_key_3: str
+    fondy_merchant_id_1: str
+    fondy_merchant_id_2: str
+    fondy_merchant_id_3: str
 
 
 @dataclass
@@ -96,8 +100,12 @@ class Config:
                 token=env.str('BOT_TOKEN'),
                 admin_ids=tuple(map(int, env.list('ADMIN_IDS'))),
                 moder_ids=tuple(map(int, env.list('MODER_IDS'))),
-                fondy_credit_key=env.str('FONDY_CREDIT_KEY'),
-                fondy_merchant_id=env.str('FONDY_MERCHANT_ID'),
+                fondy_secret_key_1=env.str('FONDY_SECRET_KEY_1'),
+                fondy_secret_key_2=env.str('FONDY_SECRET_KEY_2'),
+                fondy_secret_key_3=env.str('FONDY_SECRET_KEY_3'),
+                fondy_merchant_id_1=env.int('FONDY_MERCHANT_ID_1'),
+                fondy_merchant_id_2=env.int('FONDY_MERCHANT_ID_2'),
+                fondy_merchant_id_3=env.int('FONDY_MERCHANT_ID_3'),
             ),
             db=DbConfig(
                 host=env.str('DB_HOST', 'localhost'),

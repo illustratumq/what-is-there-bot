@@ -16,6 +16,7 @@ class User(TimedBaseModel):
     user_id = sa.Column(sa.BIGINT, primary_key=True, autoincrement=False, index=True)
     commission_id = sa.Column(sa.BIGINT, nullable=False, default=1)
     full_name = sa.Column(sa.VARCHAR(255), nullable=False)
+    inn = sa.Column(sa.BIGINT, nullable=True)
     mention = sa.Column(sa.VARCHAR(300), nullable=False)
     status = sa.Column(ENUM(UserStatusEnum), default=UserStatusEnum.ACTIVE, nullable=False)
     type = sa.Column(ENUM(UserTypeEnum), default=UserTypeEnum.USER, nullable=False)

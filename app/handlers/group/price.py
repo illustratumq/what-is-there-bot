@@ -126,49 +126,6 @@ async def pay_deal_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRe
     await call.bot.send_message(deal.chat_id, text,
                                 reply_markup=to_bot_kb(await get_start_link(f'pay_deal-{deal.deal_id}')))
 
-
-async def pay_method_choose(msg: Message, deal: DealRepo.model, customer: UserRepo.model, post: PostRepo.model,
-                            commission_db: CommissionRepo):
-    need_to_pay = deal.price - deal.payed
-    commission_package = await commission_db.get_commission(customer.commission_id)
-    commission = commission_package.deal_commission(deal)
-
-    text = (
-        f'Ви бажаєте оплатити угоду <b>"{post.title}"</b>.\n\n'
-        f'<b>Встановлена ціна:</b> {deal.price} грн.\n'
-    )
-
-    if deal.payed > 0:
-        text += (
-            f'<b>Сплачено:</b> {deal.payed} грн.\n'
-        )
-
-    text += (
-        f'<b>Необхідно сплатити:</b> {need_to_pay} грн + {commission} грн комісія сервісу.\n\n'
-    )
-
-    if customer.balance > 0 and customer.balance >= need_to_pay + commission:
-        text += (
-            f'ℹ️ На вашому рахунку {customer.balance} грн. Ви можете використати кошти на балансі. '
-            f'Або оплатити всю суму угоди окремим платежем.\n\nБудь-ласка оберіть метод оплати.'
-        )
-        reply_markup = pay_deal_kb(deal, balance=True)
-    elif 0 < customer.balance < need_to_pay + commission:
-        text += (
-            f'ℹ️️ На вашому рахунку {customer.balance} грн. Ви можете використати частину коштів з балансу, '
-            f'та оплатити решту у розмірі {need_to_pay + commission - customer.balance} грн. '
-            f'Або ж оплатити всю суму угоди окремим платежем.\n\n'
-            f'Будь-ласка оберіть метод оплати.'
-        )
-        reply_markup = pay_deal_kb(deal, partially=True)
-    else:
-        text += (
-            f'Будь-ласка сплатіть угоду, натиснувши кнопку нижче.'
-        )
-        reply_markup = pay_deal_kb(deal)
-
-    await msg.answer(text, reply_markup=reply_markup)
-
 def setup(dp: Dispatcher):
     dp.register_callback_query_handler(
         edit_price_cmd, ChatTypeFilter(ChatType.GROUP), room_cb.filter(action='price'), state='*'

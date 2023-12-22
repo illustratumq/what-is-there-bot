@@ -5,10 +5,14 @@ from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, ChatType, ContentTypes, Message, InputFile
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, JoinStatusEnum
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, JoinRepo, LetterRepo
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, JoinRepo, LetterRepo, \
+    OrderRepo, MerchantRepo
+from app.fondy.new_api import FondyApiWrapper
 from app.handlers.userbot import UserbotController
 from app.keyboards import Buttons
 from app.keyboards.inline.chat import close_deal_kb, confirm_moderate_kb, evaluate_deal_kb, room_cb
@@ -44,7 +48,6 @@ async def confirm_done_deal_cmd(call: CallbackQuery, callback_data: dict, deal_d
         f'{executor.create_html_link(executor.full_name)} повинні підтвердити своє рішення. Для '
         f'цього обидва користувачі мають натиснути кнопку "{Buttons.chat.confirm}", після цього чат буде видалено.\n\n'
         f'Будь ласка, не забудьте зберігти матеріали угоди надіслані Виконавцем.'
-
     )
     await call.message.edit_text(text=text, reply_markup=confirm_moderate_kb(deal, 'done_deal'))
     await state.storage.set_state(chat=call.message.chat.id, user=deal.customer_id, state='conf_done_deal')
@@ -74,28 +77,37 @@ async def confirm_cancel_deal_cmd(call: CallbackQuery, callback_data: dict, deal
     await state.storage.update_data(chat=call.message.chat.id, user=deal.customer_id, voted=False)
 
 
-async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.model,
-                                 customer: UserRepo.model, state: FSMContext, deal_db: DealRepo, post_db: PostRepo,
-                                 user_db: UserRepo, room_db: RoomRepo, commission_db: CommissionRepo, join_db: JoinRepo,
-                                 userbot: UserbotController, config: Config,
+async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMContext, userbot: UserbotController,
+                                 config: Config, fondy: FondyApiWrapper, session: sessionmaker,
                                  message: str = None, reset_state: bool = True):
+    session: AsyncSession
+    deal_db = DealRepo(session); post_db = PostRepo(session); room_db = RoomRepo(session)
+    join_db = JoinRepo(session); user_db = UserRepo(session); order_db = OrderRepo(session)
+    merchant_db = MerchantRepo(session)
+
+    post = await post_db.get_post(deal.post_id)
+    customer = await user_db.get_user(deal.customer_id)
+    orders = await order_db.get_orders_deal(deal.deal_id)
+
     deal_log_text = f'Угода відмінена.'
-    if deal.payed > 0:
-        back_to_customer = deal.payed
-        commission = await commission_db.get_commission(customer.commission_id)
-        commission = commission.calculate_commission(deal.payed)
-        customer_balance = customer.balance + back_to_customer + commission
-        await user_db.update_user(customer.user_id, balance=customer_balance)
-        text = (
-            f'На ваш рахунок повернено {back_to_customer + commission} грн.'
-        )
+
+    reversed_orders = []
+    for order in orders:
+        merchant = await merchant_db.get_merchant(order.merchant_id)
+        response = await fondy.check_order(order, merchant)
+        if response['response']['order_status'] == 'approved':
+            await fondy.reverse_order(order, merchant, 'Угода була відмінена' if not message else message)
+            reversed_orders.append(order)
+    if reversed_orders:
+        reversal_amount = sum([int(order.request_body["amount"]/100) for order in reversed_orders])
+        text = f'На ваш рахунок невдовзі буде повернено {reversal_amount} грн.'
         await bot.send_message(deal.customer_id, text)
-        deal_log_text += f'На рахунок {customer.full_name} повернено {back_to_customer + commission} грн.'
+        reversed_orders_str = ", ".join([str(order.id) for order in reversed_orders])
+        deal_log_text += f'На рахунок {customer.full_name} повернено платежі: {reversed_orders_str}'
 
     await post_db.update_post(post.post_id, status=DealStatusEnum.ACTIVE)
-    default_text = f'Угода "{post.title}" була відмінена.'
     for user_id in deal.participants:
-        text = default_text if not message else message
+        text = f'Угода "{post.title}" була відмінена.' if not message else message
         await bot.send_message(user_id, text)
 
     if deal.type == DealTypeEnum.PUBLIC:
@@ -142,7 +154,6 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, post: PostRepo.
             await deal_db.update_deal(deal.deal_id, executor_id=None)
         else:
             await deal_db.update_deal(deal.deal_id, customer_id=None)
-    executor = await user_db.get_user(deal.executor_id)
     join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
     await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
@@ -274,8 +285,8 @@ async def handle_confirm_done_deal(call: CallbackQuery, callback_data: dict, dea
 
 
 async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
-                                     post_db: PostRepo, state: FSMContext, room_db: RoomRepo, join_db: JoinRepo,
-                                     commission_db: CommissionRepo, userbot: UserbotController, config: Config):
+                                     state: FSMContext, userbot: UserbotController, config: Config,
+                                     fondy: FondyApiWrapper, session: sessionmaker):
     deal_id = int(callback_data['deal_id'])
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
@@ -284,10 +295,8 @@ async def handle_confirm_cancel_deal(call: CallbackQuery, callback_data: dict, d
     customer_data = await state.storage.get_data(chat=call.message.chat.id, user=deal.customer_id)
     executor_data = await state.storage.get_data(chat=call.message.chat.id, user=deal.executor_id)
     if customer_data['voted'] and executor_data['voted']:
-        post = await post_db.get_post(deal.post_id)
         await call.message.delete_reply_markup()
-        await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db, post_db, user_db, room_db,
-                                     commission_db, join_db, userbot, config)
+        await cancel_deal_processing(call.bot, deal, state, userbot, config, fondy, session)
     else:
         user = customer if call.from_user.id == executor.user_id else executor
         await call.message.reply(f'Ваш голос зараховано!\nОчікуємо на голос {user.mention}.')

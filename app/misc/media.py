@@ -48,8 +48,8 @@ def make_admin_media_template(room_name: str, reason: str, status: str, file: st
     return new_path
 
 
-def make_chat_photo_template(number: int):
-    logo = Image.open(f'app/data/chat.jpg')
+def make_chat_photo_template(path: str, number: int):
+    logo = Image.open(path)
     font = ImageFont.truetype('Helvetica 77 Bold Condensed.otf', 180)
     drawer = ImageDraw.Draw(logo)
     drawer.text((367, 367), f'#{number}', fill='#0087EB', font=font, anchor='mm')
