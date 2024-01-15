@@ -10,7 +10,6 @@ from aiogram.types import ParseMode, AllowedUpdates, BotCommand
 from app import handlers, middlewares
 from app.database.services.db_engine import create_db_engine_and_session_pool
 from app.fondy.new_api import FondyApiWrapper
-from app.fondy.tests import test
 from app.handlers.userbot import UserbotController
 from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
@@ -18,7 +17,7 @@ from app.misc.scheduler import compose_scheduler
 from app.misc.setup import *
 
 log = logging.getLogger(__name__)
-logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
+# logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
 
 
 async def set_bot_commands(bot: Bot) -> None:
@@ -62,7 +61,6 @@ async def main():
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
 
-    await test(sqlalchemy_session)
     await setup_cron_function(scheduler)
     await set_bot_commands(bot)
     await setup_default_merchants(sqlalchemy_session, config)

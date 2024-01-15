@@ -36,10 +36,11 @@ class Deal(TimedBaseModel):
 
     @property
     def chat_status(self):
-        if self.payed >= self.price and self.payed > 0:
-            return 'Оплачена'
-        elif self.price > self.payed and self.price > 0:
-            return 'Не доплачена'
+        if self.payed > 0:
+            if self.payed == self.price:
+                return 'Оплачена'
+            elif self.price > self.payed:
+                return 'Не доплачена'
         else:
             return 'Неоплачена'
 

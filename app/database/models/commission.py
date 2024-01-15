@@ -22,7 +22,7 @@ class Commission(TimedBaseModel):
         if need_to_pay <= self.trigger_price_1:
             return self.merchant_1
         elif self.trigger_price_1 < need_to_pay <= self.trigger_price_2:
-            return self.merchant_3
+            return self.merchant_2
         else:
             return self.merchant_3
 

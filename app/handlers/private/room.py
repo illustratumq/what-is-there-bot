@@ -55,6 +55,12 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
         f'{invite_link}\n\nАбо натисніть на кнопку під цим повідомленням'
     )
     executor = await user_db.get_user(join.executor_id)
+    if not executor.inn:
+        await call.message.answer(
+            '<b>Зауваж, твій ІПН відсутній</b>\n\n'
+            'Для виплати коштів нам необхідно твій ідентифікаційний номер, заповнити його можна в'
+            'Мої кошти -> ІПН.'
+        )
     await deal.create_log(deal_db, f'Угода ухвалена з {executor.full_name} ({join.executor_id})')
     await deal.create_log(deal_db, f'Визначено чат угоди {room_chat_id}')
     customer_msg = await call.bot.send_message(

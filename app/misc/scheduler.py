@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from tzlocal import get_localzone
 
 from app.config import Config
-from app.fondy.api import FondyApiWrapper
+from app.fondy.new_api import FondyApiWrapper
 from app.handlers.userbot import UserbotController
 
 

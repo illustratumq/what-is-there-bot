@@ -6,7 +6,9 @@ from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import CallbackQuery, Message, ChatType
 from aiogram.utils.deep_linking import get_start_link
 
-from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo
+from app.database.services.enums import OrderTypeEnum
+from app.database.services.repos import DealRepo, UserRepo, PostRepo, CommissionRepo, OrderRepo, MerchantRepo
+from app.fondy.new_api import FondyApiWrapper
 from app.keyboards.inline.chat import room_cb, back_chat_kb, room_pay_kb
 from app.keyboards.inline.deal import to_bot_kb
 from app.keyboards.inline.pay import pay_deal_kb
@@ -69,7 +71,8 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
 
 
 async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
-                          state: FSMContext, customer: UserRepo.model, price: int):
+                          state: FSMContext, customer: UserRepo.model, price: int, fondy: FondyApiWrapper,
+                          order_db: OrderRepo, merchant_db: MerchantRepo):
     text = (
         f'🔔 Ціна угоди була успішно змінена на {price} грн.\n\n'
     )
@@ -80,17 +83,13 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
         )
         reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
     else:
-        if price > deal.payed:
-            text += (
-                f'Тепер {customer.create_html_link(customer.full_name)} повинен доплатити '
-                f'різницю у розмірі {price-deal.payed} грн.'
-            )
-            reply_markup = room_pay_kb(deal)
-        else:
-            text += (
-                f'Різниця у розмірі {price - deal.payed} грн. буде нарахована '
-                f'{customer.create_html_link(customer.full_name)} на баланс.'
-            )
+        orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
+        merchant = await merchant_db.get_merchant(orders[0].merchant_id)
+        await fondy.reverse_order(orders[0], merchant, comment='Скасування, оплати через зміну ціни угоди')
+        text += (
+            f'Попеденій платіж був повернутий {customer.create_html_link(customer.full_name)}.\n'
+            f'Для сплати угоди будь ласка повторіть плтажну операцію ще раз, з новою ціною угоди.'
+        )
     await msg.answer(text, reply_markup=reply_markup)
     await deal_db.update_deal(deal.deal_id, price=price)
     await state.storage.reset_data(chat=msg.chat.id, user=deal.executor_id)

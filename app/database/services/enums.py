@@ -38,19 +38,11 @@ class DealTypeEnum(Enum):
     PRIVATE = 'PRIVATE'
 
 
-class OrderStatusEnum(Enum):
-    CREATED = 'CREATED'
-    PROCESSING = 'PROCESSING'
-    DECLINED = 'DECLINED'
-    APPROVED = 'APPROVED'
-    EXPIRED = 'EXPIRED'
-    REVERSED = 'REVERSE'
-
-
 class OrderTypeEnum(Enum):
     ORDER = 'ORDER'
     CAPTURE = 'CAPTURE'
-    SETTLEMENT = 'SETTLEMENT'
+    REVERSE = 'REVERSE'
+    PAYOUT = 'PAYOUT'
 
 class JoinStatusEnum(Enum):
     EDIT = 'EDIT'

@@ -37,6 +37,9 @@ class TgBot:
     token: str
     admin_ids: tuple[int]
     moder_ids: tuple[int]
+    fondy_p2p_key_1: str
+    fondy_p2p_key_2: str
+    fondy_p2p_key_3: str
     fondy_secret_key_1: str
     fondy_secret_key_2: str
     fondy_secret_key_3: str
@@ -100,6 +103,9 @@ class Config:
                 token=env.str('BOT_TOKEN'),
                 admin_ids=tuple(map(int, env.list('ADMIN_IDS'))),
                 moder_ids=tuple(map(int, env.list('MODER_IDS'))),
+                fondy_p2p_key_1=env.str('FONDY_P2P_KEY_1'),
+                fondy_p2p_key_2=env.str('FONDY_P2P_KEY_2'),
+                fondy_p2p_key_3=env.str('FONDY_P2P_KEY_3'),
                 fondy_secret_key_1=env.str('FONDY_SECRET_KEY_1'),
                 fondy_secret_key_2=env.str('FONDY_SECRET_KEY_2'),
                 fondy_secret_key_3=env.str('FONDY_SECRET_KEY_3'),

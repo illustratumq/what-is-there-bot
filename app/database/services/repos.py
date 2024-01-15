@@ -1,6 +1,6 @@
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, OrderTypeEnum
 from app.misc.times import now, deltatime
 
 
@@ -185,16 +185,20 @@ class OrderRepo(BaseRepo[Order]):
         return await self.get_one(self.model.id == order_id)
 
     async def create_log(self, order_id: int, text: str):
-        ordr = await self.get_one(order_id)
+        ordr = await self.get_order(order_id)
         log = ordr.log if ordr.log else ''
         new_log = log + f'\n[{now().strftime("%H:%M:%S %d.%m.%y")}]: {text}'
         await self.update_order(order_id, log=new_log)
 
-    async def get_orders_to_check(self):
-        await self.get_one(self.model.request_body['request'][''])
+    async def get_orders_to_check(self) -> list[Order]:
+        orders = []
+        for o in await self.get_all(self.model.type == OrderTypeEnum.ORDER):
+            if o.request_answer['response']['order_status'] == 'created':
+                orders.append(o)
+        return orders
 
-    async def get_orders_deal(self, deal_id: int) -> list[Order]:
-        return await self.get_all(self.model.deal_id == deal_id)
+    async def get_orders_deal(self, deal_id: int, order_type: OrderTypeEnum) -> list[Order]:
+        return await self.get_all(self.model.deal_id == deal_id, self.model.type == order_type)
 
     async def update_order(self, order_id: int, **kwargs) -> None:
         return await self.update(self.model.id == order_id, **kwargs)

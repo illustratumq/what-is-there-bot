@@ -9,9 +9,9 @@ from aiogram.utils.markdown import hide_link
 
 from app.config import Config
 from app.database.services.enums import JoinStatusEnum
-from app.database.services.repos import DealRepo, PostRepo, UserRepo, JoinRepo, LetterRepo
+from app.database.services.repos import DealRepo, PostRepo, UserRepo, JoinRepo
 from app.filters.admin import CommentFilter
-from app.keyboards.inline.deal import moderate_deal_kb, deal_cb, pagination_deal_kb, comment_cb, send_deal_kb, \
+from app.keyboards.inline.deal import moderate_deal_kb, deal_cb, comment_cb, send_deal_kb, \
     executor_comments_kb
 from app.states.states import ParticipateSG
 
@@ -132,7 +132,6 @@ async def send_comments_about_executor(call: CallbackQuery, callback_data: dict,
 
 
 async def executor_comments_list(query: InlineQuery, deal_db: DealRepo, user_db: UserRepo):
-    print('HERE')
     results = []
     query_split_data = query.query.split('@')
     if query_split_data[-1] != '':

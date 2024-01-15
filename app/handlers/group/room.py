@@ -100,12 +100,17 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
 
 
 async def chat_menu_cmd(msg: Message, deal_db: DealRepo, post_db: PostRepo,
-                        user_db: UserRepo, room_db: RoomRepo):
+                        user_db: UserRepo, room_db: RoomRepo, userbot: UserbotController):
     deal = await deal_db.get_deal_chat(msg.chat.id)
     post = await post_db.get_post(deal.post_id)
     room = await room_db.get_room(deal.chat_id)
     if not room.both_in_chat:
         await msg.delete()
+        data = {
+            deal.executor_id: 'Замовник',
+            deal.customer_id: 'Виконавець'
+        }
+        await msg.answer(f'Дочекайтесь поки {data[msg.from_user.id]} доєднається')
         return
     customer = await user_db.get_user(deal.customer_id)
     executor = await user_db.get_user(deal.executor_id)

@@ -2,11 +2,13 @@ from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter, Command
 from aiogram.types import CallbackQuery, ChatType, Message
+from sqlalchemy.orm import sessionmaker
 
 from app.config import Config
 from app.database.services.enums import UserStatusEnum
 from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo, CommissionRepo, SettingRepo, JoinRepo, \
     LetterRepo
+from app.fondy.new_api import FondyApiWrapper
 from app.handlers.admin.users import detail_user_info
 from app.handlers.userbot import UserbotController
 from app.keyboards.inline.admin import admin_command_kb, admin_confirm_kb, admin_room_cb, admin_choose_user_kb, \
@@ -99,20 +101,19 @@ async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: Use
                                room_db, commission_db, join_db, letter_db, userbot, config)
 
 async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
-                            room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo, state: FSMContext,
-                            userbot: UserbotController, config: Config, join_db: JoinRepo):
+                            room_db: RoomRepo, post_db: PostRepo, state: FSMContext,
+                            userbot: UserbotController, config: Config, fondy: FondyApiWrapper,
+                            session: sessionmaker):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
     post = await post_db.get_post(deal.post_id)
     room = await room_db.get_room(deal.chat_id)
     admin = await user_db.get_user(call.from_user.id)
-    customer = await user_db.get_user(deal.customer_id)
     await room_db.update_room(room.chat_id, reason=f'{room.reason}. Угода номер №{deal.deal_id} '
                                                    f'була відмінена адміністратором')
     text_to_channel = await room.construct_admin_moderate_text(room_db,  call.bot, config, admin,
                                                                done_action='Завершено')
     await call.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
-    await cancel_deal_processing(call.bot, deal, post, customer, state, deal_db,
-                                 post_db, user_db, room_db, commission_db, join_db, userbot, config,
+    await cancel_deal_processing(call.bot, deal, state, userbot, config, fondy, session,
                                  message=f'🔔 Ваша угода "{post.title}", була відмінена адміністратором')
     await call.message.edit_text(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно відмнінена!')
 

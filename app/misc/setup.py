@@ -12,13 +12,14 @@ log = logging.getLogger(__name__)
 async def setup_default_merchants(session: sessionmaker, config: Config):
     session: AsyncSession = session()
     merchant_db = MerchantRepo(session)
+    fondy = config.bot
     if await merchant_db.count() == 0:
-        await merchant_db.add(merchant_id=config.bot.fondy_merchant_id_1, name='Мерчант 10', percent=0.1,
-                              secret_key=config.bot.fondy_secret_key_1)
-        await merchant_db.add(merchant_id=config.bot.fondy_merchant_id_2, name='Мерчант 7', percent=0.07,
-                              secret_key=config.bot.fondy_secret_key_2)
-        await merchant_db.add(merchant_id=config.bot.fondy_merchant_id_3, name='Мерчант 5', percent=0.05,
-                              secret_key=config.bot.fondy_secret_key_2)
+        await merchant_db.add(merchant_id=fondy.fondy_merchant_id_1, name='Мерчант 10', percent=0.1,
+                              secret_key=fondy.fondy_secret_key_1, p2p_key=fondy.fondy_p2p_key_1)
+        await merchant_db.add(merchant_id=fondy.fondy_merchant_id_2, name='Мерчант 7', percent=0.07,
+                              secret_key=fondy.fondy_secret_key_2, p2p_key=fondy.fondy_p2p_key_2)
+        await merchant_db.add(merchant_id=fondy.fondy_merchant_id_3, name='Мерчант 5', percent=0.05,
+                              secret_key=fondy.fondy_secret_key_3, p2p_key=fondy.fondy_p2p_key_3)
         log.info('Додано дані про мерчантів...')
     await session.commit()
     await session.close()

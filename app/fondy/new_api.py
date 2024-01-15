@@ -7,17 +7,19 @@ from aiogram.utils.json import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from app.config import Config
 from app.database.models import Order
-from app.database.services.repos import Deal, OrderRepo, CommissionRepo, UserRepo, MerchantRepo
+from app.database.services.enums import OrderTypeEnum
+from app.database.services.repos import Deal, OrderRepo, CommissionRepo, UserRepo, MerchantRepo, DealRepo
 
 log = logging.getLogger(__name__)
 
 class FondyApiWrapper:
 
     order_url = 'https://pay.fondy.eu/api/checkout/url/'
-    check_url = 'https://pay.fondy.eu/api/status/order_id'
+    checkout_url = 'https://pay.fondy.eu/api/status/order_id'
     capture_url = 'https://pay.fondy.eu/api/capture/order_id'
+    reverse_url = 'https://pay.fondy.eu/api/reverse/order_id'
+    p2p_url = 'https://pay.fondy.eu/api/p2pcredit/'
 
     def __init__(self, session: sessionmaker):
         self.session = session
@@ -25,14 +27,12 @@ class FondyApiWrapper:
     @staticmethod
     def _generate_signature(*values) -> str:
         string = '|'.join([str(m) for m in values])
-        print(string)
         s = hashlib.sha1(bytes(string, 'utf-8'))
         return s.hexdigest()
 
     def pull_signature(self, data: dict, secret_key) -> None:
         keys = list(data['request'].keys())
         keys.sort()
-        print(keys)
         signature_args = [secret_key]
         for key in keys:
             signature_args.append(data['request'][key])
@@ -56,7 +56,7 @@ class FondyApiWrapper:
         merchant_db = MerchantRepo(session)
         customer = await user_db.get_user(deal.customer_id)
         commission = await commission_db.get_commission(customer.commission_id)
-        orders = await order_db.get_orders_deal(deal.deal_id)
+        orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
 
         orders_merchants = list(set([order.merchant_id for order in orders]))
         if len(orders_merchants) == 1 and orders_merchants[0] == commission.choose_merchant(deal.price):
@@ -65,7 +65,7 @@ class FondyApiWrapper:
             merchant_id = commission.choose_merchant(need_to_pay)
         merchant = await merchant_db.get_merchant(merchant_id)
         order = await order_db.add(deal_id=deal.deal_id, merchant_id=merchant_id)
-        # await order_db.create_log(order.id, 'Платіж створено')
+        await order_db.create_log(order.id, 'Платіж створено')
 
         order_desc = (
             f'Сплата за угоду №T{deal.deal_id}'
@@ -87,7 +87,6 @@ class FondyApiWrapper:
         if reservation_data:
             inn = base64.b64encode(('{\n  "receiver_inn": "' + str(reservation_data) + '"\n}').encode('utf-8'))
             data['request'].update(receiver_data=str(inn))
-        print(data)
         await order_db.update_order(order.id, request_body=dict(data['request']))
         self.pull_signature(data, merchant.secret_key)
         response = await self._post(self.order_url, data)
@@ -105,69 +104,63 @@ class FondyApiWrapper:
             }
         }
         self.pull_signature(data, merchant.secret_key)
-        return await self._post(self.check_url, data)
+        return await self._post(self.checkout_url, data)
 
     async def reverse_order(self, order: OrderRepo.model, merchant: MerchantRepo.model, comment: str) -> dict:
         session: AsyncSession = self.session()
         order_db = OrderRepo(session)
+        print(order.request_body['amount'])
         data = {
            'request': {
               'order_id': order.order_id,
               'currency': 'UAH',
-              'amount': order.request_body['amount'],
+              'amount': order.request_answer['response']['actual_amount'],
               'merchant_id': order.request_body['merchant_id'],
               'comment': comment
            }
         }
         self.pull_signature(data, merchant.secret_key)
-        response = await self._post(self.check_url, data)
-        await order_db.update_order(order.id, request_reverse=dict(response))
+        response = await self._post(self.reverse_url, data)
+        await order_db.update_order(order.id, request_answer=dict(response))
         await session.commit()
         await session.close()
         return response
 
-    async def payout_order(self, order: OrderRepo.model, merchant: MerchantRepo.model, card_number: str):
+    async def payout_order(self, deal: Deal, merchant: MerchantRepo.model, card_number: str, amount: int):
         session: AsyncSession = self.session()
         order_db = OrderRepo(session)
-        # data = {
-        #     'request': {
-        #         'order_id': order.order_id,
-        #         'order_desc': 'Оплата за угоду',
-        #         'currency': 'UAH',
-        #         'amount': '92784',
-        #         'receiver_card_number': card_number,
-        #         'merchant_id': merchant.merchant_id
-        #       }
-        # }
+        user_db = UserRepo(session)
+        deal_db = DealRepo(session)
+        order = await order_db.add(deal_id=deal.deal_id, merchant_id=merchant.merchant_id, type=OrderTypeEnum.PAYOUT)
         data = {
-            'request': {'order_id': '1703098778',
-                        'order_desc': 'Оплата за угоду',
-                        'currency': 'UAH',
-                        'amount': '92784',
-                        'receiver_card_number': '4731185670621553',
-                        'merchant_id': 1537378,
-                        'signature': 'aa020713b9c872effddcc1a792a1e85dc66807c9'
-                        }
+            'request': {
+                'order_id': order.order_id,
+                'order_desc': 'Оплата за угоду',
+                'currency': 'UAH',
+                'amount': amount * 100,
+                'receiver_card_number': card_number,
+                'merchant_id': str(merchant.merchant_id)
+              }
         }
-        self.pull_signature(data, 'jfZ2fG73cU5RtTpcMQUtmvauhREd8Jg4')
-        log.info(data)
-        response = await self._post('https://pay.fondy.eu/api/p2pcredit/', data)
-        log.info(response)
-        # await order_db.update_order(order.id, request_reverse=dict(response))
+        self.pull_signature(data, merchant.p2p_key)
+        deal = await deal_db.get_deal(order.deal_id)
+        customer = await user_db.get_user(deal.customer_id)
+        inn = base64.b64encode(('{\n  "receiver_inn": "' + str(customer.inn) + '"\n}').encode('utf-8'))
+        inn = str(inn).replace("b'", '').replace("'", '')
+        data['request'].update(receiver_data=str(inn))
+        response = await self._post(self.p2p_url, data)
+        await order_db.update_order(order.id, request_answer=dict(response))
+        return response, order
 
     async def make_capture(self, order: Order, merchant: MerchantRepo.model) -> dict:
-        """
-        :return: json
-
-        API documentation:  https://docs.fondy.eu/ru/docs/page/12
-        """
         data = {
             'request': {
                 'order_id': order.request_body['order_id'],
                 'merchant_id': order.request_body['merchant_id'],
-                'amount': order.request_body['amount'],
+                'amount': order.request_answer['response']['actual_amount'],
                 'currency': order.request_body['currency']
             }
         }
         self.pull_signature(data, merchant.secret_key)
         return await self._post(self.capture_url, data)
+

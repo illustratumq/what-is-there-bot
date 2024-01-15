@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import timedelta, datetime
+from pprint import pprint
 
 from aiogram import Bot
 from aiogram.types import InputFile
@@ -9,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, OrderStatusEnum
+from app.database.services.enums import DealStatusEnum
 from app.database.services.repos import DealRepo, UserRepo, PostRepo, RoomRepo, CommissionRepo, MarkerRepo, SettingRepo, \
-    OrderRepo, JoinRepo
-from app.fondy.api import FondyApiWrapper
+    OrderRepo, JoinRepo, MerchantRepo
+from app.fondy.new_api import FondyApiWrapper
 from app.handlers.admin.database import save_database, save_database_json
 from app.handlers.group.cancel import cancel_deal_processing
 from app.handlers.userbot import UserbotController
@@ -61,6 +62,10 @@ class database:
     def join_db(self):
         return JoinRepo(self.session)
 
+    @property
+    def merchant_db(self):
+        return MerchantRepo(self.session)
+
     async def close(self):
         await self.session.commit()
         await self.session.close()
@@ -74,7 +79,7 @@ async def setup_cron_function(scheduler: ContextSchedulerDecorator):
     #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     # )
     # scheduler.add_job(
-    #     func=checkout_payments, trigger='interval', seconds=30, name='Перевірка платіжок'
+    #     func=checkout_payments, trigger='interval', seconds=5, name='Перевірка платіжок'
     # )
     # scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
     # scheduler.add_job(
@@ -83,7 +88,8 @@ async def setup_cron_function(scheduler: ContextSchedulerDecorator):
     log.info('Cron функції успішно заплановані')
 
 
-async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: UserbotController, config: Config):
+async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: UserbotController, config: Config,
+                                      fondy: FondyApiWrapper):
     db = database(session)
     for deal in await db.deal_db.get_deal_status(DealStatusEnum.BUSY):
         if deal.payed == 0 and deal.next_activity_date and localize(deal.next_activity_date) <= now():
@@ -103,47 +109,36 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
             else:
                 post = await db.post_db.get_post(deal.post_id)
                 room = await db.room_db.get_room(deal.chat_id)
-                message = (
-                    f'<i>Угода "{post.title}" ({room.name}) була відмінена автоматично, через неактивність у чаті.</i>'
-                )
+                message = f'<i>Угода "{post.title}" ({room.name}) була відмінена автоматично, через неактивність у чаті.</i>'
                 bot.set_current(bot)
-                await cancel_deal_processing(bot, deal, post, customer, None, db.deal_db, db.post_db, db.user_db,
-                                             db.room_db, db.commission_db, db.join_db, userbot, config, message=message,
+                await cancel_deal_processing(bot, deal, None, userbot, config, fondy, session, message=message,
                                              reset_state=False)
 
 
 async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrapper):
     db = database(session)
-    for order in await db.order_db.get_orders_status(OrderStatusEnum.PROCESSING):
-        response = (await fondy.check_order(order))['response']
-        if response['order_status'] == 'approved':
-            deal = await db.deal_db.get_deal(int(response['merchant_data']))
+    for order in await db.order_db.get_orders_to_check():
+        merchant = await db.merchant_db.get_merchant(order.merchant_id)
+        response = await fondy.check_order(order, merchant)
+        if response['response']['order_status'] == 'approved':
+            # actual_amount = int(response['response']['actual_amount']) / 100
+            amount = int(int(response['response']['amount']) / 100)
+            await db.order_db.update_order(order.id, request_answer=dict(response))
+            deal = await db.deal_db.get_deal(order.deal_id)
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
-            need_to_pay = int(int(response['actual_amount']) / 100)
-            log_text = f'Угода оплачена: через платіжну систему {need_to_pay} грн. ({order.id=})'
-            if 'pay_from_balance' in order.body.keys():
-                pay_from_balance = int(order.body['pay_from_balance'])
-                need_to_pay += pay_from_balance
-                log_text += f' з частковою оплатою з балансу {pay_from_balance} грн.'
-            commission_package = await db.commission_db.get_commission(customer.commission_id)
-            commission = commission_package.deal_commission(deal)
-            await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + need_to_pay - commission,
-                                         commission=deal.commission + commission)
-            # TODO: перевірити розрахунок комісії
-            log_text += f' комісія {commission} грн.'
-            await deal.create_log(db.deal_db, log_text)
-            text_to_chat = (
-                f'<b>💳 Угода була успішно сплачена, кошти зберігаються на балансі сервісу.</b>\n\n'
-                f'{executor.create_html_link(executor.full_name)} можете приступати до роботи, '
-                f'{customer.create_html_link(customer.full_name)}, чекайте на рішення.'
+            await deal.create_log(db.deal_db, f'Угода оплачена через платіжну систему {amount} грн. ({order.id=})')
+            await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + amount)
+            text = (
+                '<b>Угода успішно оплачена</b>\n\n'
+                f'{executor.create_html_link(executor.full_name)}, можете приступати до роботи. '
+                f'{customer.create_html_link(customer.full_name)}, очікуйте на рішення.'
             )
             text_to_customer = (
-                f'<i>Угода #{deal.deal_id} успішно оплачена. З вашого рахунку списано {need_to_pay + commission} грн.</i>'
+                f'Платіж за угоду №{deal.deal_id} проведено успішно'
             )
-            await bot.send_message(deal.customer_id, text_to_customer)
-            await bot.send_message(deal.chat_id, text_to_chat)
-            await db.order_db.update_order(order.id, status=OrderStatusEnum.APPROVED)
+            await bot.send_message(chat_id=deal.chat_id, text=text)
+            await bot.send_message(chat_id=customer.user_id, text=text_to_customer)
 
 
 async def send_database(session: sessionmaker, bot: Bot, config: Config):

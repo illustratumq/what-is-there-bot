@@ -8,7 +8,7 @@ from aiogram.types import Message, ChatType
 from aiogram.utils.markdown import hide_link
 
 from app.config import Config
-from app.database.services.enums import DealStatusEnum, UserTypeEnum, JoinStatusEnum
+from app.database.services.enums import DealStatusEnum, UserTypeEnum, JoinStatusEnum, OrderTypeEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo, OrderRepo, \
     MerchantRepo
 from app.filters import IsAdminFilter
@@ -225,34 +225,47 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
     deal = await deal_db.get_deal(deal_id)
     customer = await user_db.get_user(deal.customer_id)
     need_to_pay = deal.price - deal.payed
-    orders = await order_db.get_orders_deal(deal_id)
-
+    orders = await order_db.get_orders_deal(deal_id, OrderTypeEnum.ORDER)
+    merchant = None
     url = None
+
     if orders:
         for order in orders:
-            if order.request_answer['response']['order_status'] == 'created':
-                merchant = await merchant_db.get_merchant(order.merchant_id)
-                if (await fondy.check_order(order, merchant))['response']['order_status'] == 'created':
-                    if int(order.request_body['amount']/100) != need_to_pay:
-                        await order_db.delete_order(order.id)
-                    else:
-                        url = order.url
+            if order.request_answer:
+                if order.request_answer['response']['order_status'] == 'created':
+                    merchant = await merchant_db.get_merchant(order.merchant_id)
+                    order_status = (await fondy.check_order(order, merchant))['response']['order_status']
+                    if order_status == 'created':
+                        if int(order.request_body['amount']/100) != need_to_pay:
+                            await order_db.delete_order(order.id)
+                        else:
+                            url = order.url
+                    elif order_status == 'approved':
+                        text = (
+                            f'🧾 Ваш чек на оплату угоди\n\n'
+                            f'<b>Навза угоди</b>: {post.title}\n'
+                            f'<b>ID угоди</b>: {deal.deal_id}\n'
+                            f'<b>Статус платежу</b>: Сплачено ✅'
+                        )
+                        await msg.answer(text, reply_markup=to_bot_kb(url=order.url, text='💳 Переглянути дані платежу'))
+                        return
     if not url:
         response, order = await fondy.create_order(deal, need_to_pay, customer.inn)
         if response['response']['response_status'] != 'success':
             await msg.answer(response)
             return
         url = response['response']['checkout_url']
+        merchant = await merchant_db.get_merchant(order.merchant_id)
         await order_db.update_order(order.id, url=url)
 
     text = (
         f'🧾 Ваш чек на оплату угоди\n\n'
         f'<b>Навза угоди</b>: {post.title}\n'
         f'<b>ID угоди</b>: {deal.deal_id}\n'
-        f'<b>Сума сплати без комісії</b>: {need_to_pay} грн.\n\n'
+        f'<b>Сума до сплати</b>: {merchant.calculate_commission(need_to_pay)} грн.\n\n'
         f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}'
     )
-    await msg.answer(text, reply_markup=to_bot_kb(url=url, text='Оплатити'))
+    await msg.answer(text, reply_markup=to_bot_kb(url=url, text='💳 Оплатити угоду'))
 
 
 def setup(dp: Dispatcher):
