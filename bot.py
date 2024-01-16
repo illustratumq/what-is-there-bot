@@ -29,10 +29,11 @@ async def set_bot_commands(bot: Bot) -> None:
     log.info("Установка комманд пройшла успішно")
 
 
-async def notify_admin(bot: Bot, admin_ids: tuple[int]) -> None:
+async def notify_admin(bot: Bot, userbot: UserbotController, admin_ids: tuple[int]) -> None:
     for admin_id in admin_ids:
         try:
             await bot.send_message(admin_id, 'Бот запущено')
+            await userbot._client.send_message(admin_id, 'Юзербот запущено')
         except aiogram.exceptions.ChatNotFound:
             log.warning(f'Адмін з {admin_id} не ініціалізував чат.')
 
@@ -61,16 +62,16 @@ async def main():
     handlers.setup(dp)
     middlewares.setup(dp, environments, sqlalchemy_session)
 
+    await userbot.connect()
     await setup_cron_function(scheduler)
     await set_bot_commands(bot)
     await setup_default_merchants(sqlalchemy_session, config)
     await setup_default_commission_pack(sqlalchemy_session, config)
     await setup_default_admin_settings(sqlalchemy_session)
-    await notify_admin(bot, config.bot.admin_ids)
+    await notify_admin(bot, userbot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
 
     try:
-        await userbot.connect()
         scheduler.start()
         await dp.skip_updates()
         await dp.start_polling(allowed_updates=allowed_updates, reset_webhook=True)
