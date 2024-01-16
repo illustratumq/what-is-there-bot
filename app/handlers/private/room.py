@@ -56,7 +56,7 @@ async def create_room_cmd(call: CallbackQuery, callback_data: dict, deal_db: Dea
     )
     executor = await user_db.get_user(join.executor_id)
     if not executor.inn:
-        await call.message.answer(
+        await call.bot.send_message(deal.executor_id,
             '<b>Зауваж, твій ІПН відсутній</b>\n\n'
             'Для виплати коштів нам необхідно твій ідентифікаційний номер, заповнити його можна в'
             'Мої кошти -> ІПН.'

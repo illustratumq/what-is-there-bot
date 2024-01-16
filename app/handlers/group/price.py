@@ -40,7 +40,8 @@ async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: Deal
 
 
 async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, user_db: UserRepo,
-                           commission_db: CommissionRepo):
+                           commission_db: CommissionRepo, fondy: FondyApiWrapper, order_db: OrderRepo,
+                           merchant_db: MerchantRepo):
     new_price = int(msg.text)
     deal = await deal_db.get_deal_chat(msg.chat.id)
     customer = await user_db.get_user(deal.customer_id)
@@ -64,7 +65,7 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
                          f'щоб підтвердити зміну ціни.')
     elif customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
         customer = await user_db.get_user(deal.customer_id)
-        await apply_new_price(msg, deal_db, deal, state, customer, new_price)
+        await apply_new_price(msg, deal_db, deal, state, customer, new_price, fondy, order_db, merchant_db)
         return
     else:
         await msg.answer('Ціни які ви вказали не співпадають.')
