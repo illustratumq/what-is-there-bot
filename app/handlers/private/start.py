@@ -212,7 +212,7 @@ async def confirm_private_deal_cmd(msg: Message, deep_link: re.Match, deal_db: D
 
 async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo,
                                  order_db: OrderRepo, post_db: PostRepo, merchant_db: MerchantRepo,
-                                 fondy: FondyApiWrapper):
+                                 fondy: FondyApiWrapper, config: Config):
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
@@ -232,7 +232,9 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
     if orders:
         for order in orders:
             if order.request_answer:
-                if order.request_answer['response']['order_status'] == 'created':
+                if 'error_message' in order.request_answer['response'].keys():
+                    pass
+                elif order.request_answer['response']['order_status'] == 'created':
                     merchant = await merchant_db.get_merchant(order.merchant_id)
                     order_status = (await fondy.check_order(order, merchant))['response']['order_status']
                     if order_status == 'created':
