@@ -11,23 +11,37 @@ services:
       - ./app:/src/app
     command: >
       sh -c "
-        #python ./app/website/manage.py migrate --fake-initial &&
-        #python ./app/website/manage.py makemigrations whatistherebot &&
-        #python ./app/website/manage.py createsuperuser --noinput &&
-        python ./app/website/manage.py runserver 0.0.0.0:8000&
+        #python ./app/admin/manage.py migrate --fake-initial &&
+        #python ./app/admin/manage.py makemigrations instapuller &&
+        #python ./app/admin/manage.py createsuperuser --noinput &&
+        #python ./app/admin/manage.py runserver 0.0.0.0:8000&
         python -O bot.py"
-    restart: always
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
       - ".env"
     environment:
-      DB_HOST: "${DB_HOST}"
+      DB_HOST: database
       REDIS_HOST: redis
     depends_on:
-     - redis
+      - database
+      - redis
     networks:
      - botnet
+
+  redis:
+    container_name: "${BOT_NAME}-redis"
+    image: redis:7-alpine
+    env_file:
+      - ".env"
+    ports:
+      - "6377:6379"
+    volumes:
+      - ./redisdata:/var/lib/redis
+    restart: unless-stopped
+    networks:
+      - botnet
 
   database:
     container_name: "${BOT_NAME}-database"
@@ -58,18 +72,6 @@ services:
     networks:
       - botnet
 
-  redis:
-    container_name: "${BOT_NAME}-redis"
-    image: redis:7-alpine
-    env_file:
-      - ".env"
-    ports:
-      - "6377:6379"
-    volumes:
-      - ./redisdata:/var/lib/redis
-    restart: always
-    networks:
-      - botnet
 
 networks:
   botnet:
