@@ -10,7 +10,7 @@ from aiogram.utils.markdown import hide_link
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, UserTypeEnum, JoinStatusEnum, OrderTypeEnum
 from app.database.services.repos import DealRepo, PostRepo, UserRepo, RoomRepo, LetterRepo, JoinRepo, OrderRepo, \
-    MerchantRepo
+    MerchantRepo, AdminSettingRepo
 from app.filters import IsAdminFilter
 from app.fondy.new_api import FondyApiWrapper
 from app.handlers.private.room import get_room
@@ -64,8 +64,16 @@ async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
 
 
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo, post_db: PostRepo,
-                          join_db: JoinRepo, room_db: RoomRepo, state: FSMContext):
+                          join_db: JoinRepo, state: FSMContext, admin_setting_db: AdminSettingRepo):
     await msg.delete()
+    deals = await deal_db.get_deal_executor(msg.from_user.id)
+    setting = await admin_setting_db.get_setting(1)
+    if setting.setting_status and not deals:
+        await msg.answer(
+            'Наразі ми призупиняємо подачу заяв на участь в угодах на необмежений термін. \n\n'
+            'Дякуємо за розуміння!'
+        )
+        return
     deal_id = int(deep_link.groups()[-1])
     deal = await deal_db.get_deal(deal_id)
     post = await post_db.get_post(deal.post_id)
@@ -226,12 +234,13 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
     customer = await user_db.get_user(deal.customer_id)
     need_to_pay = deal.price - deal.payed
     orders = await order_db.get_orders_deal(deal_id, OrderTypeEnum.ORDER)
-    merchant = None
+    order = None
     url = None
 
     if orders:
         for order in orders:
             if order.request_answer:
+                order = order
                 if 'error_message' in order.request_answer['response'].keys():
                     pass
                 elif order.request_answer['response']['order_status'] == 'created':
@@ -257,14 +266,13 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
             await msg.answer(response)
             return
         url = response['response']['checkout_url']
-        merchant = await merchant_db.get_merchant(order.merchant_id)
         await order_db.update_order(order.id, url=url)
 
     text = (
         f'🧾 Ваш чек на оплату угоди\n\n'
         f'<b>Навза угоди</b>: {post.title}\n'
         f'<b>ID угоди</b>: {deal.deal_id}\n'
-        f'<b>Сума до сплати</b>: {merchant.calculate_commission(need_to_pay)} грн.\n\n'
+        f'<b>Сума до сплати</b>: {order.request_answer["response"]["actual_amount"]} грн.\n\n'
         f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}'
     )
     await msg.answer(text, reply_markup=to_bot_kb(url=url, text='💳 Оплатити угоду'))
