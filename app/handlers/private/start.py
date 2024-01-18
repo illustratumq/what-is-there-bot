@@ -66,7 +66,7 @@ async def cancel_action_cmd(msg: Message, user_db: UserRepo, state: FSMContext):
 async def participate_cmd(msg: Message, deep_link: re.Match, deal_db: DealRepo, user_db: UserRepo, post_db: PostRepo,
                           join_db: JoinRepo, state: FSMContext, admin_setting_db: AdminSettingRepo):
     await msg.delete()
-    deals = await deal_db.get_deal_executor(msg.from_user.id)
+    deals = await deal_db.get_deal_executor(msg.from_user.id, DealStatusEnum.DONE)
     setting = await admin_setting_db.get_setting(1)
     if setting.setting_status and not deals:
         await msg.answer(
