@@ -32,7 +32,8 @@ class UserbotController:
             await self._client.connect()
             self._client.me = await self._client.get_me()
         except Exception as Error:
-            log.warning(Error)
+            # log.warning(Error)
+            pass
 
     async def get_client_user_id(self) -> int:
         await self.connect()

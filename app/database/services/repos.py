@@ -193,8 +193,9 @@ class OrderRepo(BaseRepo[Order]):
     async def get_orders_to_check(self) -> list[Order]:
         orders = []
         for o in await self.get_all(self.model.type == OrderTypeEnum.ORDER):
-            if o.request_answer['response']['order_status'] == 'created':
-                orders.append(o)
+            if 'order_status' in o.request_answer['response'].keys():
+                if o.request_answer['response']['order_status'] == 'created':
+                    orders.append(o)
         return orders
 
     async def get_orders_deal(self, deal_id: int, order_type: OrderTypeEnum) -> list[Order]:

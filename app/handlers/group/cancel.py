@@ -134,9 +134,6 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
                 disable_web_page_preview=True if not post.message_id else False
             )
             await post_db.update_post(post.post_id, reserv_message_id=reserv_channel.message_id)
-
-    await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
-                              message_id=None)
     if reset_state:
         await state.storage.reset_data(chat=deal.chat_id, user=deal.customer_id)
         await state.storage.reset_data(chat=deal.chat_id, user=deal.executor_id)
@@ -149,7 +146,10 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
                 if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
                     await userbot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
-            log.error(str(error) + f'\n{deal.deal_id=}')
+            log.warning(str(error) + f'\n{deal.deal_id=}')
+
+    await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
+                              message_id=None)
 
     if deal.type == DealTypeEnum.PRIVATE:
         if deal.customer_id == post.user_id:
