@@ -56,13 +56,7 @@ class FondyApiWrapper:
         merchant_db = MerchantRepo(session)
         customer = await user_db.get_user(deal.customer_id)
         commission = await commission_db.get_commission(customer.commission_id)
-        orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
-
-        orders_merchants = list(set([order.merchant_id for order in orders]))
-        if len(orders_merchants) == 1 and orders_merchants[0] == commission.choose_merchant(deal.price):
-            merchant_id = orders_merchants[0]
-        else:
-            merchant_id = commission.choose_merchant(need_to_pay)
+        merchant_id = commission.choose_merchant(deal.price)
         merchant = await merchant_db.get_merchant(merchant_id)
         order = await order_db.add(deal_id=deal.deal_id, merchant_id=merchant_id)
         await order_db.create_log(order.id, 'Платіж створено')
@@ -152,12 +146,12 @@ class FondyApiWrapper:
         await order_db.update_order(order.id, request_answer=dict(response))
         return response, order
 
-    async def make_capture(self, order: Order, merchant: MerchantRepo.model) -> dict:
+    async def make_capture(self, order: Order, merchant: MerchantRepo.model, amount: float = None) -> dict:
         data = {
             'request': {
                 'order_id': order.request_body['order_id'],
                 'merchant_id': order.request_body['merchant_id'],
-                'amount': order.request_answer['response']['actual_amount'],
+                'amount': order.request_answer['response']['actual_amount'] if not amount else amount,
                 'currency': order.request_body['currency']
             }
         }

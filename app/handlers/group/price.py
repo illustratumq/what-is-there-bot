@@ -65,15 +65,14 @@ async def handle_new_price(msg: Message, state: FSMContext, deal_db: DealRepo, u
                          f'щоб підтвердити зміну ціни.')
     elif customer_data['price'] == executor_data['price'] and customer_data['price'] != 0:
         customer = await user_db.get_user(deal.customer_id)
-        await apply_new_price(msg, deal_db, deal, state, customer, new_price, fondy, order_db, merchant_db)
+        await apply_new_price(msg, deal_db, deal, state, customer, new_price)
         return
     else:
         await msg.answer('Ціни які ви вказали не співпадають.')
 
 
 async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
-                          state: FSMContext, customer: UserRepo.model, price: int, fondy: FondyApiWrapper,
-                          order_db: OrderRepo, merchant_db: MerchantRepo):
+                          state: FSMContext, customer: UserRepo.model, price: int):
     text = (
         f'🔔 Ціна угоди була успішно змінена на {price} грн.\n\n'
     )
@@ -83,13 +82,16 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
             'Якщо все готово, переходьте до оплати угоди'
         )
         reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
-    else:
-        orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
-        merchant = await merchant_db.get_merchant(orders[0].merchant_id)
-        await fondy.reverse_order(orders[0], merchant, comment='Скасування, оплати через зміну ціни угоди')
+    elif deal.price > deal.payed:
         text += (
-            f'Попеденій платіж був повернутий {customer.create_html_link(customer.full_name)}.\n'
-            f'Для сплати угоди будь ласка повторіть плтажну операцію ще раз, з новою ціною угоди.'
+            f'Тепер {customer.create_html_link("Замовник")} повинен доплатити '
+            f'різницю у розмірі {price-deal.payed} грн.'
+        )
+        reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
+    else:
+        text += (
+            f'Різниця у розмірі {price - deal.payed} грн. буде повернена '
+            f'{customer.create_html_link("Замовнику")} на баланс, після завершення угоди.'
         )
     await msg.answer(text, reply_markup=reply_markup)
     await deal_db.update_deal(deal.deal_id, price=price)

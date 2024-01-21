@@ -195,23 +195,42 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, state:
         deal_log_text = 'Угода завершилась за згодою користувачів.'
         orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
         commission_for_executor = 0
+        payed = 0
+        back_to_customer = 0
         for order in orders:
             merchant = await merchant_db.get_merchant(order.merchant_id)
             response = await fondy.check_order(order, merchant)
             if response['response']['order_status'] == 'approved':
-                response = await fondy.make_capture(order, merchant)
-                if response['response']['capture_status'] != 'captured':
-                    await call.bot.send_message(config.misc.admin_help_channel_id,
-                                                text=f'🔴💳 Не вдалось зробити <b>capture</b>\n\n{order.id=}')
-                actual_amount = int(response['response']['actual_amount'])
-                amount = int(response['response']['amount'])
-                commission_for_executor += round((actual_amount - amount) / 100, 2)
+                if payed < deal.price:
+                    actual_amount = int(response['response']['actual_amount'])
+                    amount = int(response['response']['amount'])
+                    clear_amount = round(amount / 100, 2)
+                    if payed + clear_amount > deal.price:
+                        particular_capture = deal.price - payed
+                        response = await fondy.make_capture(order, merchant, int(particular_capture * 100))
+                        back_to_customer += clear_amount - particular_capture
+                    else:
+                        commission_for_executor += round((actual_amount - amount) / 100, 2)
+                        response = await fondy.make_capture(order, merchant)
+                    if response['response']['capture_status'] != 'captured':
+                        await call.bot.send_message(config.misc.admin_help_channel_id,
+                                                    text=f'🔴💳 Не вдалось зробити <b>capture</b>\n\n{order.id=}')
+                else:
+                    merchant = await merchant_db.get_merchant(order.merchant_id)
+                    response = await fondy.reverse_order(order, merchant, 'Повернення коштів')
+                    if 'error_message' in response['response'].keys():
+                        await call.bot.send_message(config.misc.admin_help_channel_id,
+                                                    text=f'🔴💳 Не вдалось зробити <b>reverse</b> під час закриття угоди\n\n{order.id=}')
         executor = await user_db.get_user(deal.executor_id)
         customer = await user_db.get_user(deal.customer_id)
         balance_for_executor = executor.balance + deal.price - commission_for_executor
         await user_db.update_user(executor.user_id, balance=balance_for_executor)
+        if back_to_customer:
+            back_to_customer = f'Очікуйте на часткове поверненя коштів {back_to_customer} грн, впродовж 14 днів. '
+        else:
+            back_to_customer = ''
         text = (
-            f'На ваш рахунок зараховано {deal.price-commission_for_executor} грн. '
+            f'На ваш рахунок зараховано {deal.price-commission_for_executor} грн. {back_to_customer}'
             f'Комісія становить {commission_for_executor} грн. '
             f'Ви можете вивести ці кошти на банківську карту, або використати для оплати іншої угоди.\n\n'
             f'Дякуємо за використання нашого сервісу.'

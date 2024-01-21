@@ -235,6 +235,7 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
     need_to_pay = deal.price - deal.payed
     orders = await order_db.get_orders_deal(deal_id, OrderTypeEnum.ORDER)
     order = None
+    merchant = None
     url = None
 
     if orders:
@@ -262,6 +263,7 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
                         return
     if not url:
         response, order = await fondy.create_order(deal, need_to_pay, customer.inn)
+        merchant = await merchant_db.get_merchant(order.merchant_id)
         if response['response']['response_status'] != 'success':
             await msg.answer(response)
             return
@@ -272,7 +274,7 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
         f'🧾 Ваш чек на оплату угоди\n\n'
         f'<b>Навза угоди</b>: {post.title}\n'
         f'<b>ID угоди</b>: {deal.deal_id}\n'
-        f'<b>Сума до сплати</b>: {order.request_answer["response"]["actual_amount"]} грн.\n\n'
+        f'<b>Сума до сплати</b>: {merchant.calculate_commission(need_to_pay)} грн.\n\n'
         f'Будь-ласка оплатіть угоду натиснувши на кнопку {hide_link(url)}'
     )
     await msg.answer(text, reply_markup=to_bot_kb(url=url, text='💳 Оплатити угоду'))
