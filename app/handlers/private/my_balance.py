@@ -28,7 +28,7 @@ async def my_balance_cmd(msg: Message, user_db: UserRepo):
 
 
 async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state: FSMContext):
-    deals = await deal_db.get_deal_customer(msg.from_user.id, DealStatusEnum.DONE)
+    deals = await deal_db.get_deal_executor(msg.from_user.id, DealStatusEnum.DONE)
     orders_to_pay = []
     cards = set()
     for deal in deals:
