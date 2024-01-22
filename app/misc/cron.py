@@ -78,9 +78,9 @@ async def setup_cron_function(scheduler: ContextSchedulerDecorator):
     # scheduler.add_job(
     #    func=send_database, trigger='cron', hour=23, minute=59, name='Бекап бази даних'
     # )
-    # scheduler.add_job(
-    #     func=checkout_payments, trigger='interval', seconds=5, name='Перевірка платіжок'
-    # )
+    scheduler.add_job(
+        func=checkout_payments, trigger='interval', seconds=30, name='Перевірка платіжок'
+    )
     # scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
     # scheduler.add_job(
     #    func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
