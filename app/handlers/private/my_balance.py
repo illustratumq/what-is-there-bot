@@ -63,7 +63,7 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
     if not is_valid_credit_card(card_number):
         await msg.answer('Вказано невірний номер карти, перевір будь ласка та спробуй ще раз')
         return
-    deals = await deal_db.get_deal_customer(msg.from_user.id, DealStatusEnum.DONE)
+    deals = await deal_db.get_deal_executor(msg.from_user.id, DealStatusEnum.DONE)
     orders_to_pay = {}
     for deal in deals:
         orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
