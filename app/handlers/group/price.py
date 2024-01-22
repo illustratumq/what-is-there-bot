@@ -82,7 +82,7 @@ async def apply_new_price(msg: Message, deal_db: DealRepo, deal: DealRepo.model,
             'Якщо все готово, переходьте до оплати угоди'
         )
         reply_markup = to_bot_kb(url=await get_start_link(f'pay_deal-{deal.deal_id}'))
-    elif deal.price > deal.payed:
+    elif price > deal.payed:
         text += (
             f'Тепер {customer.create_html_link("Замовник")} повинен доплатити '
             f'різницю у розмірі {price-deal.payed} грн.'
