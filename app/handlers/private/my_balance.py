@@ -131,6 +131,6 @@ def setup(dp: Dispatcher):
     dp.register_message_handler(
         input_inn_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.inn, state='*')
     dp.register_message_handler(save_user_inn, ChatTypeFilter(ChatType.PRIVATE), state='inn_set')
-    dp.register_message_handler(payout_cmd, ChatTypeFilter(ChatType.PRIVATE), state='input_card')
-    dp.register_callback_query_handler(payout_cmd, payout_cb.filter(action='payout'))
+    dp.register_message_handler(save_card_and_make_payout, ChatTypeFilter(ChatType.PRIVATE), state='input_card')
+    dp.register_callback_query_handler(save_card_and_make_payout, payout_cb.filter(action='payout'))
 
