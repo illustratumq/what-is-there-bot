@@ -22,5 +22,5 @@ class Order(TimedBaseModel):
     def calculate_payout(self):
         actual_amount = int(self.request_answer['response']['actual_amount'])
         amount = int(self.request_answer['response']['amount'])
-        commission_for_executor = round((actual_amount - amount) / 100, 2)
+        commission_for_executor = round((actual_amount - amount), 2)
         return round(amount - commission_for_executor, 2)

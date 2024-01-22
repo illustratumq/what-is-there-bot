@@ -42,7 +42,7 @@ async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state
                 cards.add(order.request_body['receiver_card_number'])
     if orders_to_pay:
         cards = list(cards)
-        payout = round(sum([order.calculate_payout() for order in orders_to_pay]), 2)
+        payout = round(sum([order.calculate_payout() for order in orders_to_pay]) / 100, 2)
         text = f'Вам доступна сума до виплати {payout} грн'
         if cards:
             await msg.answer(text, reply_markup=payout_kb(cards, msg.from_user.id))
