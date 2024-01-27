@@ -140,11 +140,11 @@ class FondyApiWrapper:
         deal = await deal_db.get_deal(order.deal_id)
         executor = await user_db.get_user(deal.executor_id)
         inn_string = (
-                '{\n  "receiver_inn": "' + str(executor.inn) + '"\n}'
+                '{\n  "receiver_inn": "' + str(executor.inn) + '",\n  "receiver_doc_type": "ipn"\n}'
         ).encode('utf-8')
         inn = base64.b64encode(inn_string)
         inn = str(inn).replace("b'", '').replace("'", '')
-        data['request'].update(receiver_data=str(inn))
+        data['request'].update(reservation_data=str(inn))
         await order_db.update_order(order.id, request_body=data)
         response = await self._post(self.p2p_url, data)
         await order_db.update_order(order.id, request_answer=dict(response))
