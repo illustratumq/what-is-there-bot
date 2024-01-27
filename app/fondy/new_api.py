@@ -120,12 +120,12 @@ class FondyApiWrapper:
         await session.close()
         return response
 
-    async def payout_order(self, deal: Deal, merchant: MerchantRepo.model, card_number: str, amount: int):
+    async def payout_order(self, deal: Deal, merchant_id: int, card_number: str, amount: int):
         session: AsyncSession = self.session()
         order_db = OrderRepo(session)
         user_db = UserRepo(session)
         deal_db = DealRepo(session)
-        order = await order_db.add(deal_id=deal.deal_id, merchant_id=merchant.merchant_id, type=OrderTypeEnum.PAYOUT)
+        order = await order_db.add(deal_id=deal.deal_id, merchant_id=merchant_id, type=OrderTypeEnum.PAYOUT)
         data = {
             'request': {
                 'order_id': order.order_id,
