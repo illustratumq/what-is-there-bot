@@ -142,7 +142,9 @@ class FondyApiWrapper:
         inn = base64.b64encode(('{\n  "receiver_inn": "' + str(customer.inn) + '"\n}').encode('utf-8'))
         inn = str(inn).replace("b'", '').replace("'", '')
         data['request'].update(receiver_data=str(inn))
+        log.info(data)
         response = await self._post(self.p2p_url, data)
+        log.info(response)
         await order_db.update_order(order.id, request_answer=dict(response))
         return response, order
 

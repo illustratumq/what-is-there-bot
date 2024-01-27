@@ -89,6 +89,8 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
             successful_payout.append(result)
     if any(successful_payout):
         await msg.answer('Виплата пройшла успішно. Очікуйте на зарахування коштів')
+    else:
+        await msg.answer('Проблеми з виплатою коштів. З\'ясовую причину')
     await state.finish()
 
 async def make_payout(fondy: FondyApiWrapper, payout_data: dict, bot: Bot):
