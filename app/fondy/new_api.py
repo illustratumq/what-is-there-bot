@@ -131,7 +131,7 @@ class FondyApiWrapper:
                 'order_id': order.order_id,
                 'order_desc': 'Оплата за угоду',
                 'currency': 'UAH',
-                'amount': amount * 100,
+                'amount': amount,
                 'receiver_card_number': card_number,
                 'merchant_id': str(merchant.merchant_id)
               }
