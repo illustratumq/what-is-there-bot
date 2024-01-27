@@ -36,11 +36,11 @@ async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state
         orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
         orders_payouted = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.PAYOUT)
         for order in orders:
-            if 'order_status' in order.request_answer.keys():
+            if 'order_status' in order.request_answer['response'].keys():
                 if order.request_answer['response']['order_status'] == 'approved':
                     orders_to_pay.append(order)
         for order in orders_payouted:
-            if 'order_status' in order.request_answer.keys():
+            if 'order_status' in order.request_answer['response'].keys():
                 if order.request_answer['response']['order_status'] == 'approved':
                     cards.add(order.request_body['receiver_card_number'])
     if orders_to_pay:
