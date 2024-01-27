@@ -70,7 +70,7 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
         for order in orders:
             if order.request_answer['response']['order_status'] == 'approved':
                 if order.merchant_id in orders_to_pay.keys():
-                    orders_to_pay.update({order.merchant_id: orders_to_pay[order.merchant_id + [order]]})
+                    orders_to_pay.update({order.merchant_id: orders_to_pay[order.merchant_id] + [order]})
                 else:
                     orders_to_pay.update({order.merchant_id: [order.merchant_id]})
     successful_payout = []
