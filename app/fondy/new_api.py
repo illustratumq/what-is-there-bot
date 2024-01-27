@@ -139,9 +139,8 @@ class FondyApiWrapper:
         self.pull_signature(data, merchant.p2p_key)
         deal = await deal_db.get_deal(order.deal_id)
         customer = await user_db.get_user(deal.customer_id)
-        '{\n"receiver_inn": "{here_inn}",\n{"receiver_doc_type"'
         inn_string = (
-                '{\n  "receiver_inn": "' + str(customer.inn) + '"\n,"receiver_doc_type": "ipn"\n}'
+                '{\n  "receiver_inn": "' + str(customer.inn) + '",\n"receiver_doc_type": "ipn"\n}'
         ).encode('utf-8')
         inn = base64.b64encode(inn_string)
         inn = str(inn).replace("b'", '').replace("'", '')
