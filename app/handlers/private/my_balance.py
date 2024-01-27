@@ -8,7 +8,7 @@ from marshmallow import pprint
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, OrderTypeEnum
-from app.database.services.repos import UserRepo, OrderRepo, DealRepo
+from app.database.services.repos import UserRepo, OrderRepo, DealRepo, MerchantRepo
 from app.fondy.new_api import FondyApiWrapper
 from app.keyboards import Buttons
 from app.keyboards.inline.pay import payout_kb, payout_cb
@@ -54,7 +54,8 @@ async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state
         await msg.answer('На вашому рахуку немає коштів')
 
 async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMContext, fondy: FondyApiWrapper,
-                                    deal_db: DealRepo, order_db: OrderRepo, callback_data: dict = None):
+                                    deal_db: DealRepo, order_db: OrderRepo, merchant_db: MerchantRepo,
+                                    callback_data: dict = None):
     if isinstance(upd, Message):
         msg = upd
         card_number = msg.text.replace(' ', '').strip()
@@ -77,12 +78,13 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
     successful_payout = []
     for merchant in orders_to_pay.keys():
         orders = orders_to_pay.get(merchant)
+        merchant = await merchant_db.get_merchant(merchant)
         for order in orders:
             order: OrderRepo.model
             deal = await deal_db.get_deal(order.deal_id)
             result = await make_payout(
                 fondy,
-                dict(deal=deal, merchant_id=merchant, card_number=card_number, amount=order.calculate_payout()),
+                dict(deal=deal, merchant=merchant, card_number=card_number, amount=order.calculate_payout()),
                 msg.bot)
             successful_payout.append(result)
     if any(successful_payout):
