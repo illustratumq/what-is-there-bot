@@ -136,12 +136,12 @@ class FondyApiWrapper:
                 'merchant_id': str(merchant.merchant_id)
               }
         }
-        self.pull_signature(data, merchant.p2p_key)
         deal = await deal_db.get_deal(order.deal_id)
         customer = await user_db.get_user(deal.customer_id)
         inn = base64.b64encode(('{\n  "receiver_inn": "' + str(customer.inn) + '"\n}').encode('utf-8'))
         inn = str(inn).replace("b'", '').replace("'", '')
         data['request'].update(receiver_data=str(inn))
+        self.pull_signature(data, merchant.p2p_key)
         log.info(data)
         response = await self._post(self.p2p_url, data)
         log.info(response)
