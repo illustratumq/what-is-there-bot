@@ -79,7 +79,11 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
         orders = orders_to_pay.get(merchant)
         for order in orders:
             order: OrderRepo.model
-            result = await make_payout(fondy, {order.deal_id, merchant, card_number, order.calculate_payout()}, msg.bot)
+            deal = await deal_db.get_deal(order.deal_id)
+            result = await make_payout(
+                fondy,
+                dict(deal=deal, merchant=merchant, card_number=card_number, amount=order.calculate_payout()),
+                msg.bot)
             successful_payout.append(result)
     if any(successful_payout):
         await msg.answer('Виплата пройшла успішно. Очікуйте на зарахування коштів')
