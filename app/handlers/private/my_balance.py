@@ -4,6 +4,7 @@ from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import Message, ChatType, CallbackQuery
+from marshmallow import pprint
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, OrderTypeEnum
@@ -72,7 +73,7 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
                 if order.merchant_id in orders_to_pay.keys():
                     orders_to_pay.update({order.merchant_id: orders_to_pay[order.merchant_id] + [order]})
                 else:
-                    orders_to_pay.update({order.merchant_id: [order.merchant_id]})
+                    orders_to_pay.update({order.merchant_id: [order]})
     successful_payout = []
     for merchant in orders_to_pay.keys():
         orders = orders_to_pay.get(merchant)
