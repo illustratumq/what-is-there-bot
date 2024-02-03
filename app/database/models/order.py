@@ -14,6 +14,7 @@ class Order(TimedBaseModel):
     request_body = sa.Column(sa.JSON, default={}, nullable=False)
     request_answer = sa.Column(sa.JSON, default={}, nullable=True)
     log = sa.Column(sa.VARCHAR, nullable=True)
+    payed = sa.Column(sa.BOOLEAN, nullable=False, default=False)
 
     @property
     def order_id(self) -> str:
@@ -24,3 +25,13 @@ class Order(TimedBaseModel):
         amount = int(self.request_answer['response']['amount'])
         commission_for_executor = round((actual_amount - amount), 2)
         return round(amount - commission_for_executor, 2)
+
+    def is_valid_response(self):
+        return 'error_message' not in self.request_answer['response'].keys()
+
+    def is_order_status(self, status: str):
+        return self.request_answer['response']['order_status'] == status
+
+    @property
+    def get_request_body(self):
+        return self.request_body['request']

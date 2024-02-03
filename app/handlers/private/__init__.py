@@ -9,7 +9,6 @@ from app.handlers.private import markers
 from app.handlers.private import room
 from app.handlers.private import my_rating
 from app.handlers.private import my_balance
-from app.handlers.private import pay
 from app.handlers.private import evaluate
 from app.handlers.private import back
 from app.handlers.private import new_deal
@@ -22,7 +21,6 @@ def setup(dp: Dispatcher):
     new_deal.setup(dp)
     participate.setup(dp)
     room.setup(dp)
-    pay.setup(dp)
     markers.setup(dp)
     my_posts.setup(dp)
     my_chats.setup(dp)

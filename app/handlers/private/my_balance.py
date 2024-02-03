@@ -22,32 +22,31 @@ def is_valid_credit_card(card_number):
     else:
         return False
 
-async def my_balance_cmd(msg: Message, user_db: UserRepo):
+async def my_balance_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo,
+                         user_db: UserRepo, state: FSMContext):
     user = await user_db.get_user(msg.from_user.id)
-    await msg.answer(f'Ваш баланс {user.balance} грн',
-                     reply_markup=basic_kb(([Buttons.menu.payout], [Buttons.menu.inn], [Buttons.menu.back])))
-
-
-async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state: FSMContext):
+    if not user.is_inn_exist():
+        await msg.answer('Твій ІПН не знайдено, будь ласка заповни цю інформацію 👇')
+        await state.set_state(state='inn_set')
+        return
     deals = await deal_db.get_deal_executor(msg.from_user.id, DealStatusEnum.DONE)
     orders_to_pay = []
     cards = set()
     for deal in deals:
         orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
-        orders_payouted = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.PAYOUT)
+        orders_done = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.PAYOUT)
         for order in orders:
-            if 'order_status' in order.request_answer['response'].keys():
-                if order.request_answer['response']['order_status'] == 'approved':
-                    orders_to_pay.append(order)
-        for order in orders_payouted:
-            if 'order_status' in order.request_answer['response'].keys():
-                if order.request_answer['response']['order_status'] == 'approved':
-                    cards.add(order.request_body['receiver_card_number'])
+            if order.is_valid_response() and order.is_order_status('approved') and not order.payed:
+                orders_to_pay.append(order)
+        for order in orders_done:
+            if order.is_valid_response() and order.is_order_status('approved'):
+                cards.add(order.get_request_body['receiver_card_number'])
     if orders_to_pay:
         cards = list(cards)
         payout = round(sum([order.calculate_payout() for order in orders_to_pay]) / 100, 2)
         text = f'Вам доступна сума до виплати {payout} грн'
         if cards:
+            text += '\n\nОберіть карту для виплати 👇'
             await msg.answer(text, reply_markup=payout_kb(cards, msg.from_user.id))
         else:
             await msg.answer(text + '\n\nВкажіть карту на яку зарахуються кошти 👇')
@@ -55,9 +54,15 @@ async def payout_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo, state
     else:
         await msg.answer('На вашому рахуку немає коштів')
 
+async def add_new_card_to_payout(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+    await call.message.answer('Вкажіть карту на яку зарахуються кошти 👇')
+    await state.set_state(state='card_input')
+
 async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMContext, fondy: FondyApiWrapper,
                                     deal_db: DealRepo, order_db: OrderRepo, merchant_db: MerchantRepo,
                                     callback_data: dict = None):
+    user_id = upd.from_user.id
     if isinstance(upd, Message):
         msg = upd
         card_number = msg.text.replace(' ', '').strip()
@@ -67,26 +72,39 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
     if not is_valid_credit_card(card_number):
         await msg.answer('Вказано невірний номер карти, перевір будь ласка та спробуй ще раз')
         return
-    deals = await deal_db.get_deal_executor(msg.from_user.id, DealStatusEnum.DONE)
+    await msg.answer(card_number)
+    deals = await deal_db.get_deal_executor(user_id, DealStatusEnum.DONE)
     orders_to_pay = {}
     for deal in deals:
         orders = await order_db.get_orders_deal(deal.deal_id, OrderTypeEnum.ORDER)
         for order in orders:
-            if order.request_answer['response']['order_status'] == 'approved':
+            if order.is_valid_response() and order.is_order_status('approved') and not order.payed:
+                print(order)
                 if order.merchant_id in orders_to_pay.keys():
-                    orders_to_pay.update({order.merchant_id: orders_to_pay[order.merchant_id] + [order]})
+                    if order.deal_id in orders_to_pay[order.merchant_id].keys():
+                        orders_to_pay.update({order.merchant_id:
+                                                  {order.deal_id: orders_to_pay[order.merchant_id][order.deal_id] + [order]}
+                        })
+                    else:
+                        orders_to_pay.update({order.merchant_id:
+                                                  {order.deal_id: [order]}
+                                              })
                 else:
-                    orders_to_pay.update({order.merchant_id: [order]})
+                    orders_to_pay.update({order.merchant_id: {order.deal_id: [order]}})
     successful_payout = []
     for merchant in orders_to_pay.keys():
         orders = orders_to_pay.get(merchant)
-        merchant = await merchant_db.get_merchant(merchant)
-        for order in orders:
-            order: OrderRepo.model
-            deal = await deal_db.get_deal(order.deal_id)
+        for deal in orders.keys():
+            merchant = await merchant_db.get_merchant(merchant)
+            deal = await deal_db.get_deal(deal)
+            price_sum = []
+            for order in orders_to_pay[merchant.merchant_id][deal.deal_id]:
+                price_sum.append(order.calculate_payout())
+                await order_db.update_order(order.order_id, payouted=True)
+            price_sum = sum(price_sum)
             result = await make_payout(
                 fondy,
-                dict(deal=deal, merchant=merchant, card_number=card_number, amount=order.calculate_payout()),
+                dict(deal=deal, merchant=merchant, card_number=card_number, amount=price_sum),
                 msg.bot)
             successful_payout.append(result)
     if any(successful_payout):
@@ -138,10 +156,11 @@ def setup(dp: Dispatcher):
     dp.register_message_handler(my_balance_cmd, ChatTypeFilter(ChatType.PRIVATE),
                                 text=[Buttons.menu.my_money, Buttons.menu.to_payout], state='*')
     dp.register_message_handler(
-        payout_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.payout, state='*')
-    dp.register_message_handler(
         input_inn_cmd, ChatTypeFilter(ChatType.PRIVATE), text=Buttons.menu.inn, state='*')
+    dp.register_callback_query_handler(add_new_card_to_payout, payout_cb.filter(action='add_new_card'),
+                                       state='*')
     dp.register_message_handler(save_user_inn, ChatTypeFilter(ChatType.PRIVATE), state='inn_set')
     dp.register_message_handler(save_card_and_make_payout, ChatTypeFilter(ChatType.PRIVATE), state='card_input')
-    dp.register_callback_query_handler(save_card_and_make_payout, payout_cb.filter(action='payout'))
+    dp.register_callback_query_handler(save_card_and_make_payout, payout_cb.filter(action='payout'),
+                                       state='*')
 

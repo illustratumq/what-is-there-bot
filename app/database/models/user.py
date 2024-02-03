@@ -79,3 +79,6 @@ class User(TimedBaseModel):
     def server_url(self):
         config = Config.from_env()
         return config.django.model_link('user', self.user_id)
+
+    def is_inn_exist(self):
+        return bool(self.inn)

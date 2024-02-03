@@ -33,7 +33,7 @@ async def notify_admin(bot: Bot, userbot: UserbotController, admin_ids: tuple[in
     for admin_id in admin_ids:
         try:
             await bot.send_message(admin_id, 'Бот запущено')
-            await userbot._client.send_message(admin_id, 'Юзербот запущено')
+            # await userbot._client.send_message(admin_id, 'Юзербот запущено')
         except aiogram.exceptions.ChatNotFound:
             log.warning(f'Адмін з {admin_id} не ініціалізував чат.')
 

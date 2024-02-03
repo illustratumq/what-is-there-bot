@@ -38,7 +38,9 @@ def payout_kb(cards: list[str], user_id: int):
     inline_keyboard = []
     for card in cards:
         inline_keyboard.append(
-            [InlineKeyboardButton(card, **button_cb(card))]
+            [InlineKeyboardButton(f'💳 {card}', **button_cb(card))]
         )
-
+    inline_keyboard += [
+        [InlineKeyboardButton('Додати карту', **button_cb('', action='add_new_card'))]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard, row_width=1)
