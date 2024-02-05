@@ -21,7 +21,6 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
     ordering = ['-updated_at']
     actions = [make_banned]
-    autocomplete_fields = ('commission_id',)
 
     fieldsets = (
         ('Персональна інформація', {
@@ -31,7 +30,7 @@ class UserAdmin(admin.ModelAdmin):
             'fields': ('type', 'status')
         }),
         ('Грошові дані', {
-            'fields': ('commission_id', 'bankcard', 'balance'),
+            'fields': ('balance',),
         }),
         ('Інше', {
             'fields': ('time', 'ban_comment'),
@@ -92,7 +91,7 @@ class DealAdmin(admin.ModelAdmin):
     list_display = ('__str__',  'status', 'view_post_link', 'view_customer_link', 'view_executor_link', 'updated_at')
     search_fields = ('customer_id__startswith', 'executor_id__startswith', 'deal_id__startswith')
     ordering = ['-updated_at']
-    readonly_fields = ('commission', 'log', 'created_at', 'updated_at')
+    readonly_fields = ('log', 'created_at', 'updated_at')
     autocomplete_fields = ('post_id', 'executor_id', 'customer_id', 'chat_id')
 
     def view_post_link(self, obj):
@@ -122,7 +121,7 @@ class DealAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Дані про угоду', {
-            'fields': ('log', 'commission', 'price', 'payed', 'status'),
+            'fields': ('log', 'price', 'payed', 'status'),
         }),
         ('Учасники', {
             'fields': ('post_id', 'customer_id', 'executor_id', 'chat_id'),
@@ -131,7 +130,7 @@ class DealAdmin(admin.ModelAdmin):
             'fields': ('rating', 'comment')
         }),
         ('Активність у чаті', {
-            'fields': [('activity_confirm', 'next_activity_date')]
+            'fields': ('activity_confirm', 'next_activity_date')
         }),
         ('Дата створення та оновлення', {
             'fields': [('updated_at', 'created_at')]
@@ -147,9 +146,9 @@ class CommissionAdmin(admin.ModelAdmin):
 
     form = BaseForm
 
-    list_display = ('name', 'pack_id', 'commission', 'updated_at')
-    search_fields = ('name__startswith', 'pack_id__startswith')
-    readonly_fields = ('created_at', 'updated_at')
+    list_display = ('name', 'commission_id', 'updated_at')
+    search_fields = ('name__startswith',)
+    readonly_fields = ('created_at', 'updated_at', 'merchant_1', 'merchant_2', 'merchant_3')
     ordering = ['-updated_at']
 
     fieldsets = (
@@ -157,7 +156,10 @@ class CommissionAdmin(admin.ModelAdmin):
             'fields': ('name', 'description')
         }),
         ('Цінові параметри', {
-            'fields': ('trigger', 'under', 'commission', 'minimal', 'maximal'),
+            'fields': ('trigger_price_1', 'trigger_price_2', 'minimal', 'maximal')
+        }),
+        ('Мерчанти', {
+            'fields': ('merchant_1', 'merchant_2', 'merchant_3')
         }),
         ('Дата створення та оновлення', {
             'fields': [('updated_at', 'created_at')]

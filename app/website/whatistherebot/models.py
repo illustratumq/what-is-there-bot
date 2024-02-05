@@ -23,6 +23,18 @@ class TimeBaseModel(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата останнього оновлення')
 
 
+class Merchant(TimeBaseModel):
+    class Meta:
+        db_table = 'merchants'
+        verbose_name = 'мерчанти'
+        verbose_name_plural = 'мерчанти'
+
+    merchant_id = models.BigAutoField(primary_key=True, verbose_name='Merchant ID')
+    secret_key = models.CharField(verbose_name='Ключ мерчанта')
+    p2p_key = models.CharField(verbose_name='Ключ для P2P транзакцій')
+    percent = models.FloatField(verbose_name='Відсоток на комісію')
+    name = models.CharField(verbose_name='Назва')
+
 class Commission(TimeBaseModel):
 
     class Meta:
@@ -30,14 +42,20 @@ class Commission(TimeBaseModel):
         verbose_name = 'комісійний пакет'
         verbose_name_plural = 'комісійні пакети'
 
-    pack_id = models.BigAutoField(primary_key=True, verbose_name='ID Пакету')
-    commission = models.IntegerField(verbose_name='Комісія у відсотках')
-    trigger = models.IntegerField(verbose_name='Тригерна ціна, грн')
-    under = models.IntegerField(verbose_name='Фікована комісія, грн')
-    minimal = models.IntegerField(verbose_name='Мінімальна ціна угоди, грн')
-    maximal = models.IntegerField(verbose_name='Максимальна ціна угоди, грн')
+    commission_id = models.BigAutoField(primary_key=True, verbose_name='ID Пакету', db_column='commission_id')
     name = models.CharField(max_length=255, verbose_name='Назва пакунку')
     description = models.CharField(max_length=500, verbose_name='Інформація для амдіна', null=True, blank=True)
+    minimal = models.IntegerField(verbose_name='Мінімальна ціна угоди, грн')
+    maximal = models.IntegerField(verbose_name='Максимальна ціна угоди, грн')
+    trigger_price_1 = models.IntegerField(verbose_name='Максимальна ціна першого мерчанта, грн')
+    trigger_price_2 = models.IntegerField(verbose_name='Максимальна ціна другого мерчанта, грн')
+    merchant_1 = models.ForeignKey(Merchant, verbose_name='Мерчант №1',
+                                   on_delete=models.SET_NULL, null=True,
+                                   db_column='merchant_1', related_name='merchant_1')
+    merchant_2 = models.ForeignKey(Merchant, verbose_name='Мерчант №2', on_delete=models.SET_NULL,
+                                   null=True, db_column='merchant_2', related_name='merchant_2')
+    merchant_3 = models.ForeignKey(Merchant, verbose_name='Мерчант №3', on_delete=models.SET_NULL,
+                                   null=True, db_column='merchant_3', related_name='merchant_3')
 
     def __str__(self):
         return f'{self.name}'
@@ -63,8 +81,6 @@ class User(TimeBaseModel):
 
     user_id = models.BigIntegerField(primary_key=True, verbose_name='Телеграм ID')
     full_name = models.CharField(max_length=255, null=False, verbose_name='Ім\'я')
-    commission_id = models.ForeignKey(Commission, verbose_name='Комісійний пакунок', null=True, blank=True,
-                                      on_delete=models.SET_NULL, db_column='commission_id')
     bankcard = models.CharField(max_length=16, null=True, blank=True, verbose_name='Банківська карта')
     status = models.CharField(choices=UserStatusEnum, null=False, default='UNAUTHORIZED', verbose_name='Статус')
     type = models.CharField(choices=UserTypeEnum, null=False, default='USER', verbose_name='Права')
@@ -205,7 +221,6 @@ class Deal(TimeBaseModel):
     executor_id = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='Виконавець',
                                     null=True, db_column='executor_id', related_name='executor_id', blank=True)
     price = models.IntegerField(default=0, verbose_name='Ціна угоди, грн')
-    commission = models.IntegerField(verbose_name='Комісія сервісу, грн', editable=False)
     payed = models.IntegerField(default=0, verbose_name='Оплачено, грн')
     status = models.CharField(choices=DealStatusEnum, verbose_name='Статус', default='MODERATE')
     rating = models.IntegerField(choices=DealRatingEnum, verbose_name='Рейтингова оцінка', null=True, blank=True)
