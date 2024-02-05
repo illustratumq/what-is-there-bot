@@ -34,7 +34,7 @@ async def notify_admin(bot: Bot, userbot: UserbotController, admin_ids: tuple[in
     for admin_id in admin_ids:
         try:
             await bot.send_message(admin_id, 'Бот запущено')
-            # await userbot._client.send_message(admin_id, 'Юзербот запущено')
+            await userbot._client.send_message(admin_id, 'Юзербот запущено')
         except aiogram.exceptions.ChatNotFound:
             log.warning(f'Адмін з {admin_id} не ініціалізував чат.')
 
@@ -44,7 +44,7 @@ async def main():
     bl.basic_colorized_config(level=config.misc.log_level)
     log.info('Запускаюсь...')
 
-    storage = MemoryStorage() #RedisStorage2(host=config.redis.host, port=config.redis.port)
+    storage = RedisStorage2(host=config.redis.host, port=config.redis.port)
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
