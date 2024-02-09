@@ -143,7 +143,7 @@ class Config:
                 session_name=env.str('USERBOT_SESSION_NAME', 'userbot'),
             ),
             django=Django(
-                server_host_ip=env.str('SERVER_HOST_ID', '127.0.0.1'),
+                server_host_ip=env.str('SERVER_HOST_IP', '127.0.0.1'),
                 django_site_port=env.str('DJANGO_SITE_PORT', '8000'),
                 login=env.str('DJANGO_SUPERUSER_USERNAME'),
                 password=env.str('DJANGO_SUPERUSER_PASSWORD')

@@ -11,10 +11,10 @@ services:
       - ./app:/src/app
     command: >
       sh -c "
-        #python ./app/admin/manage.py migrate --fake-initial &&
-        #python ./app/admin/manage.py makemigrations instapuller &&
-        #python ./app/admin/manage.py createsuperuser --noinput &&
-        #python ./app/admin/manage.py runserver 0.0.0.0:8000&
+        #python ./app/website/manage.py migrate --fake-initial &&
+        #python ./app/website/manage.py makemigrations instapuller &&
+        #python ./app/website/manage.py createsuperuser --noinput &&
+        python ./app/website/manage.py runserver 0.0.0.0:8000&
         python -O bot.py"
     restart: unless-stopped
     ports:
