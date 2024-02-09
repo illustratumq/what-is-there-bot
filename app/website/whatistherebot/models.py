@@ -1,17 +1,13 @@
-import os
-import sys
+import json
 
 from aiogram.utils.markdown import hide_link
-from django.contrib.postgres.fields import ArrayField
+from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
-
 from django.forms import ModelForm, Textarea
 from telebot import TeleBot
-from telebot.types import InputFile
 
 from app.config import Config
-from app.misc.media import make_post_media_template
 
 
 class TimeBaseModel(models.Model):
@@ -24,16 +20,18 @@ class TimeBaseModel(models.Model):
 
 
 class Merchant(TimeBaseModel):
+
     class Meta:
         db_table = 'merchants'
         verbose_name = 'мерчанти'
         verbose_name_plural = 'мерчанти'
 
-    merchant_id = models.BigAutoField(primary_key=True, verbose_name='Merchant ID')
-    secret_key = models.CharField(verbose_name='Ключ мерчанта')
-    p2p_key = models.CharField(verbose_name='Ключ для P2P транзакцій')
-    percent = models.FloatField(verbose_name='Відсоток на комісію')
-    name = models.CharField(verbose_name='Назва')
+    merchant_id = models.BigAutoField(primary_key=True, verbose_name='ID мерчанта')
+    secret_key = models.CharField(verbose_name='Ключ транзакцій', editable=False)
+    p2p_key = models.CharField(verbose_name='Ключ P2P транзакцій', editable=False)
+    percent = models.FloatField(verbose_name='Відсоток на комісію', editable=False)
+    name =  models.CharField(verbose_name='Назва мерчанту')
+
 
 class Commission(TimeBaseModel):
 
@@ -234,6 +232,48 @@ class Deal(TimeBaseModel):
     def __str__(self):
         return f'Угода №{self.deal_id}'
 
+class CustomJsonField(models.JSONField):
+    def from_db_value(self, value, expression, connection):
+        if isinstance(value, dict):
+            return value
+        return super().from_db_value(value, expression, connection)
+
+class Order(TimeBaseModel):
+
+    class Meta:
+        db_table = 'orders'
+        verbose_name = 'платежі'
+        verbose_name_plural = 'платежі'
+
+    OrderTypeEnum = (
+        ('ORDER', 'ОПЛАТА'),
+        ('CAPTURE', 'CAPTURE'),
+        ('REVERSE', 'ПОВЕРНЕНЯ'),
+        ('PAYOUT', 'ВИПЛАТА'),
+    )
+
+    OrderStatus = (
+        (True, 'Завершений'),
+        (False, 'Незавершений')
+    )
+
+    id = models.BigAutoField(primary_key=True, verbose_name='Номер платежу')
+    type = models.CharField(choices=OrderTypeEnum, verbose_name='Тип', default='ORDER')
+    deal_id = models.ForeignKey(Deal, on_delete=models.SET_NULL, verbose_name='Угода',
+                                null=True, db_column='deal_id')
+    url = models.CharField(null=False, verbose_name='URL платежу', editable=False)
+    request_body = CustomJsonField(verbose_name='Тіло запиту', editable=False)
+    request_answer = CustomJsonField(verbose_name='Тіло відповіді', editable=False)
+    log = models.CharField(verbose_name='Історія платежу', null=True, editable=False)
+    payed = models.BooleanField(verbose_name='Статус платежу', choices=OrderStatus)
+    merchant_id = models.ForeignKey(Merchant, on_delete=models.SET_NULL, verbose_name='Мерчант',
+                      null=True, db_column='merchant_id', editable=False)
+
+
+    @property
+    def order_id(self):
+        return str(int(self.created_at.timestamp()) + self.deal_id * self.id * int(self.created_at.microsecond / 10e3))
+    # merchant_id = sa.Column(sa.BIGINT, sa.ForeignKey('merchants.merchant_id', ondelete='SET NULL'), nullable=False)
 
 class BaseForm(ModelForm):
     class Meta:

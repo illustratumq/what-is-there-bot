@@ -34,6 +34,7 @@ ALLOWED_HOSTS = ['*']  # , config.misc.server_host_ip
 
 INSTALLED_APPS = [
     'jazzmin',
+    'django_json_widget',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

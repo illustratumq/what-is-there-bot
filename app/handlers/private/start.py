@@ -44,7 +44,6 @@ greeting_text = (
 
 
 async def start_cmd(msg: Message, state: FSMContext, user_db: UserRepo, letter_db: LetterRepo):
-    config = Config.from_env().misc.post_channel_chat_id
     bot = (await msg.bot.me).username
     if not msg.from_user.is_bot:
         new_letters = await letter_db.get_new_letters_user(msg.from_user.id)

@@ -147,7 +147,9 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
                     await userbot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
             log.warning(str(error) + f'\n{deal.deal_id=}')
-
+    executor = await user_db.get_user(deal.executor_id)
+    await copy_and_delete_history(userbot, room, deal, customer, executor, config, bot)
+    await userbot.delete_chat_history(room.chat_id)
     await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
                               message_id=None)
 
@@ -274,13 +276,14 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, state:
         letter_executor = f'Ви закінчили угоду "{post.title}", вам нараховано {deal.price - commission_for_executor} грн.'
         await letter_db.add(user_id=executor.user_id, text=letter_executor)
         await copy_and_delete_history(userbot, room, deal, customer, executor, config, call.bot)
+        await userbot.delete_chat_history(room.chat_id)
+        new_link = await userbot.create_chat_link(room.chat_id)
         join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
         if join:
             await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
         await room_db.update_room(deal.chat_id, status=RoomStatusEnum.AVAILABLE, admin_required=False, admin_id=None,
-                                  message_id=None)
+                                  message_id=None, inite_link=new_link)
         await deal_db.update_deal(deal.deal_id, chat_id=None)
-        await room_db.delete_room(room.chat_id)
         await deal.create_log(deal_db, deal_log_text)
         await session.commit()
         await session.close()
@@ -391,16 +394,16 @@ async def copy_and_delete_history(userbot: UserbotController, room: RoomRepo.mod
     messages = await userbot.get_chat_history(room.chat_id)
     chat_users = [customer.user_id, executor.user_id]
     data = {
-        '0': '🔵',
-        '1': '🔴',
-        '2': '🟠',
-        '3': '🟡',
-        '4': '🟢',
-        '5': '🔵',
-        '6': '🟣',
-        '7': '🟠',
-        '8': '🟢',
-        '9': '🟣'
+        '0': 'AA',
+        '1': 'BB',
+        '2': 'CC',
+        '3': 'AB',
+        '4': 'AC',
+        '5': 'BA',
+        '6': 'BC',
+        '7': 'CA',
+        '8': 'CB',
+        '9': 'EE'
     }
     for message in messages:
         try:
@@ -417,4 +420,3 @@ async def copy_and_delete_history(userbot: UserbotController, room: RoomRepo.mod
         except:
             pass
     await bot.send_message(config.misc.history_channel_id, history_end_msg)
-    await userbot.delete_group(room.chat_id)

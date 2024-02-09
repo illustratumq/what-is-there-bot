@@ -1,8 +1,10 @@
 from django.contrib import admin
+from django.contrib.postgres import fields
 from django.urls import reverse
 from django.utils.html import format_html
+from django_json_widget.widgets import JSONEditorWidget
 
-from .models import User, Commission, Post, Deal, Room, BaseForm
+from .models import User, Commission, Post, Deal, Room, Merchant, Order, BaseForm
 
 
 @admin.action(description='Забанити вибраних юзерів')
@@ -185,6 +187,58 @@ class RoomAdmin(admin.ModelAdmin):
         }),
         ('Модерація в чаті', {
             'fields': ('admin_required', 'admin_id', 'reason'),
+        }),
+        ('Дата створення та оновлення', {
+            'fields': [('updated_at', 'created_at')]
+        })
+    )
+
+@admin.register(Merchant)
+class MerchantAdmin(admin.ModelAdmin):
+
+    form = BaseForm
+
+    list_display = ('name', 'merchant_id', 'percent', 'updated_at')
+    search_fields = ('name__startswith', 'merchant_id__startswith')
+    readonly_fields = ('created_at', 'updated_at', 'merchant_id', 'percent', 'secret_key', 'p2p_key')
+    ordering = ['-updated_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    fieldsets = (
+        ('Основні дані', {
+            'fields': ('name', 'merchant_id', 'secret_key', 'p2p_key', 'percent')
+        }),
+        ('Дата створення та оновлення', {
+            'fields': [('updated_at', 'created_at')]
+        })
+    )
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+
+    # form = BaseForm
+
+    formfield_overrides = {
+        fields.JSONField: {'widget': JSONEditorWidget},
+    }
+
+    list_display = ('id', 'type', 'payed', 'updated_at')
+    search_fields = ('id__startswith', 'deal_id__startswith')
+    readonly_fields = ('created_at', 'updated_at', 'merchant_id', 'url', 'log', 'request_body', 'request_answer')
+    ordering = ['-updated_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    fieldsets = (
+        ('Основні дані', {
+            'fields': ('type', 'deal_id', 'merchant_id', 'url', 'log')
+        }),
+        ('Fondy дані', {
+            'fields': ('request_body', 'request_answer')
         }),
         ('Дата створення та оновлення', {
             'fields': [('updated_at', 'created_at')]

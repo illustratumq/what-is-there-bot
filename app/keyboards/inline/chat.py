@@ -7,8 +7,8 @@ evaluate_cb = CallbackData('ev', 'deal_id', 'action', 'value')
 
 def call_another_user(deal: Deal, user: str):
     return InlineKeyboardMarkup(inline_keyboard=[
-        InlineKeyboardButton(Buttons.chat.call_user.format(user),
-                             callback_data=room_cb.new(deal_id=deal.deal_id, action='call_another'))
+        [InlineKeyboardButton(Buttons.chat.call_user.format(user),
+                             callback_data=room_cb.new(deal_id=deal.deal_id, action='call_another'))]
     ])
 
 def room_menu_kb(deal: Deal, media: bool = False, payed: bool = False, pay_button: bool = False):

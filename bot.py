@@ -16,6 +16,7 @@ from app.misc.admin import set_admin_status
 from app.misc.cron import setup_cron_function
 from app.misc.scheduler import compose_scheduler
 from app.misc.setup import *
+from app.misc.times import now
 
 log = logging.getLogger(__name__)
 # logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
@@ -33,7 +34,7 @@ async def set_bot_commands(bot: Bot) -> None:
 async def notify_admin(bot: Bot, userbot: UserbotController, admin_ids: tuple[int]) -> None:
     for admin_id in admin_ids:
         try:
-            await bot.send_message(admin_id, 'Бот запущено')
+            await bot.send_message(admin_id, f'Бот запущено {now()}')
             await userbot._client.send_message(admin_id, 'Юзербот запущено')
         except aiogram.exceptions.ChatNotFound:
             log.warning(f'Адмін з {admin_id} не ініціалізував чат.')

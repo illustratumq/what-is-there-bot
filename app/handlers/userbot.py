@@ -116,9 +116,18 @@ class UserbotController:
     async def kick_chat_member(self, chat_id: int, user_id: int):
         await self.connect()
         until_date = now() + timedelta(seconds=300)
-        await self._client.set_chat_username(chat_id, 'GroupAnonymousBot')
-        # await self._set_chat_permissions(self._client, )
-        # await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=until_date)
+        await self._client.ban_chat_member(chat_id=chat_id, user_id=user_id, until_date=until_date)
+
+    async def delete_chat_history(self, chat_id: int):
+        for message in await self.get_chat_history(chat_id):
+            try:
+                await self._client.delete_messages(chat_id, message.id)
+            except:
+                pass
+        await self._client.send_message(chat_id, 'The history was cleared successful')
+
+    async def create_chat_link(self, chat_id: int):
+        return await self._client.create_chat_invite_link(chat_id, name='New chat link')
 
     async def delete_group(self, chat_id: int) -> None:
         await self.connect()
