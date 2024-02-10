@@ -29,7 +29,7 @@ class Merchant(TimeBaseModel):
     merchant_id = models.BigAutoField(primary_key=True, verbose_name='ID мерчанта')
     secret_key = models.CharField(verbose_name='Ключ транзакцій', editable=False)
     p2p_key = models.CharField(verbose_name='Ключ P2P транзакцій', editable=False)
-    percent = models.FloatField(verbose_name='Відсоток на комісію', editable=False)
+    percent = models.FloatField(verbose_name='Відсоток на комісію')
     name =  models.CharField(verbose_name='Назва мерчанту')
 
 

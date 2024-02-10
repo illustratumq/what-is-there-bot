@@ -121,14 +121,16 @@ async def checkout_payments(session: sessionmaker, bot: Bot, fondy: FondyApiWrap
         merchant = await db.merchant_db.get_merchant(order.merchant_id)
         response = await fondy.check_order(order, merchant)
         if response['response']['order_status'] == 'approved':
-            # actual_amount = int(response['response']['actual_amount']) / 100
+            actual_amount = int(response['response']['actual_amount']) / 100
             amount = int(int(response['response']['amount']) / 100)
             await db.order_db.update_order(order.id, request_answer=dict(response))
             deal = await db.deal_db.get_deal(order.deal_id)
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
-            await deal.create_log(db.deal_db, f'Угода оплачена через платіжну систему {amount} грн. ({order.id=})')
+            await deal.create_log(db.deal_db, f'Угода оплачена через платіжну систему {actual_amount} грн. ({order.id=})')
             await db.deal_db.update_deal(deal.deal_id, payed=deal.payed + amount)
+            await db.order_db.create_log(order.id, f'Платіж сплачено через мерчант {merchant.merchant_id},'
+                                                   f' {amount} грн. + {actual_amount-amount} грн.')
             text = (
                 '<b>Угода успішно оплачена</b>\n\n'
                 f'{executor.create_html_link(executor.full_name)}, можете приступати до роботи. '

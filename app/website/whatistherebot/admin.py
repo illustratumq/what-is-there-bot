@@ -200,7 +200,7 @@ class MerchantAdmin(admin.ModelAdmin):
 
     list_display = ('name', 'merchant_id', 'percent', 'updated_at')
     search_fields = ('name__startswith', 'merchant_id__startswith')
-    readonly_fields = ('created_at', 'updated_at', 'merchant_id', 'percent', 'secret_key', 'p2p_key')
+    readonly_fields = ('created_at', 'updated_at', 'merchant_id', 'secret_key', 'p2p_key')
     ordering = ['-updated_at']
 
     def has_add_permission(self, request):
@@ -235,7 +235,7 @@ class OrderAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Основні дані', {
-            'fields': ('type', 'deal_id', 'merchant_id', 'url', 'log')
+            'fields': ('type', 'payed', 'deal_id', 'merchant_id', 'url', 'log')
         }),
         ('Fondy дані', {
             'fields': ('request_body', 'request_answer')

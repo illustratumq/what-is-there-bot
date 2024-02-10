@@ -75,7 +75,7 @@ class DealRepo(BaseRepo[Deal]):
 
     async def get_comment_deals(self, executor_id: int):
         return await self.get_all(self.model.executor_id == executor_id,
-                                  self.model.rating != None,
+                                  self.model.rating > 0,
                                   self.model.status == DealStatusEnum.DONE)
 
     async def get_deal_executor(self, executor_id: int, status: DealStatusEnum) -> list[Deal]:

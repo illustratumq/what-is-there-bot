@@ -1,4 +1,5 @@
 from app.database.models import Deal
+from app.keyboards.inline.back import back_bt
 from app.keyboards.inline.base import *
 
 pay_cb = CallbackData('pay', 'deal_id', 'action')
@@ -29,6 +30,17 @@ def confirm_pay_kb(deal: Deal, action: str):
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 
+
+def card_confirm_kb(card: str, user_id: int):
+    def button_cb(card: str, action: str):
+        return dict(callback_data=payout_cb.new(user_id=user_id, card=card, action=action))
+
+    inline_keyboard = [
+        [InlineKeyboardButton('✅Tак, все вірно', **button_cb(card, 'payout'))],
+        [back_bt(text='❌ Ні, скасувати', to='menu')]
+    ]
+
+    return InlineKeyboardMarkup(row_width=1, inline_keyboard=inline_keyboard)
 
 def payout_kb(cards: list[str], user_id: int):
 

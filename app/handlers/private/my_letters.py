@@ -21,6 +21,7 @@ async def paginate_letters(upd: CallbackQuery | Message, callback_data: dict, le
 
     msg = upd.message if isinstance(upd, CallbackQuery) else upd
     letters = await letter_db.get_all_user_letters(upd.from_user.id)
+    letters = sorted(letters, key=lambda l: l.created_at, reverse=True)
     count_letters = len(letters)
 
     if callback_data['action'] in ['prev', 'next'] and count_letters == 1:

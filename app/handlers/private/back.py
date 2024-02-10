@@ -17,7 +17,7 @@ async def back_cmd(call: CallbackQuery, callback_data: dict, user_db: UserRepo,
     to = callback_data['to']
     if to == 'help_admin':
         await back_to_room_cmd(call, callback_data, user_db, deal_db, room_db, post_db)
-    elif to == 'letter_close':
+    elif to in ['letter_close', 'menu']:
         await call.message.delete()
         await start_cmd(call.message, state, user_db, letter_db)
     elif to == 'select_user':
