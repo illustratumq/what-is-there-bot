@@ -1,4 +1,5 @@
 import asyncio
+import platform
 
 import aiogram
 import betterlogging as bl
@@ -21,6 +22,13 @@ from app.misc.times import now
 log = logging.getLogger(__name__)
 # logging.getLogger('apscheduler').setLevel(logging.CRITICAL)
 
+class Device:
+    SERVER = 'SERVER'
+    WINDOWS = 'WINDOWS'
+
+    @staticmethod
+    def current():
+        return Device.WINDOWS if platform.system().lower() == 'windows' else Device.SERVER
 
 async def set_bot_commands(bot: Bot) -> None:
     await bot.set_my_commands(
@@ -45,7 +53,11 @@ async def main():
     bl.basic_colorized_config(level=config.misc.log_level)
     log.info('Запускаюсь...')
 
-    storage = RedisStorage2(host=config.redis.host, port=config.redis.port)
+    if Device.current() == Device.WINDOWS:
+        storage = MemoryStorage()
+    else:
+        storage = RedisStorage2(host=config.redis.host, port=config.redis.port)
+
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
