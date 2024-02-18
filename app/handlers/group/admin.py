@@ -75,15 +75,11 @@ async def done_deal_confirm(call: CallbackQuery, callback_data: dict, user_db: U
 
 
 async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
-                          room_db: RoomRepo, post_db: PostRepo, commission_db: CommissionRepo,
-                          state: FSMContext, userbot: UserbotController, config: Config, join_db: JoinRepo,
-                          letter_db: LetterRepo):
+                          room_db: RoomRepo, state: FSMContext, userbot: UserbotController, config: Config,
+                          fondy: FondyApiWrapper, session: sessionmaker):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
     room = await room_db.get_room(deal.chat_id)
     admin = await user_db.get_user(call.from_user.id)
-    customer = await user_db.get_user(deal.customer_id)
-    executor = await user_db.get_user(deal.executor_id)
-    post = await post_db.get_post(deal.post_id)
     if deal.price == 0:
         await call.answer('Ціна угоди ще не визначена, тому її неможливо завершити', show_alert=True)
         return
@@ -100,8 +96,7 @@ async def done_deal_admin(call: CallbackQuery, callback_data: dict, user_db: Use
                                                                done_action='Завершено')
     await call.bot.edit_message_text(text_to_channel, config.misc.admin_help_channel_id, room.message_id)
     await call.message.answer(f'🆔 #Угода_номер_{deal.deal_id} ({room.name}) була успішно завершена!')
-    await done_deal_processing(call, deal, post, customer, executor, state, deal_db, post_db, user_db,
-                               room_db, commission_db, join_db, letter_db, userbot, config)
+    await done_deal_processing(call, deal, state, userbot, config, fondy, session)
 
 async def cancel_deal_admin(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
                             room_db: RoomRepo, post_db: PostRepo, state: FSMContext,
