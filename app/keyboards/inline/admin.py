@@ -19,7 +19,7 @@ def admin_command_kb(deal: Deal):
         [InlineKeyboardButton(Buttons.deal.admin.done_deal, **button_cb('done_deal')),
          InlineKeyboardButton(Buttons.deal.admin.cancel_deal, **button_cb('cancel_deal'))],
         [InlineKeyboardButton(Buttons.deal.admin.restrict_user, **button_cb('restrict_user'))],
-        # [InlineKeyboardButton(Buttons.deal.admin.close, **button_cb('close'))]
+        [InlineKeyboardButton(Buttons.deal.admin.payed, **button_cb('make_payed'))]
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)

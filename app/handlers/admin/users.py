@@ -14,12 +14,12 @@ from app.keyboards.reply.menu import basic_kb
 async def search_user_cmd(msg: Message, state: FSMContext, config: Config):
     admin_channel = await msg.bot.get_chat(config.misc.admin_channel_id)
     text = (
-        '🔍 Для того щоб знайти користувача, використайте будь-який з наступних методів пошуку:\n\n'
-        '1) Перешліть повідомлення від користувача\n'
-        f'2) Перешліть пост з <a href="{admin_channel.invite_link}">адмін каналу</a>, '
+        'ℹ️ <b>Для того щоб знайти користувача, використайте будь-який з наступних методів пошуку</b>:\n\n'
+        '<pre>1) Перешліть повідомлення від користувача\n'
+        f'2) Перешліть пост з <a href="{admin_channel.invite_link}">адмін каналу</a>,'
         f'в якому брав участь цей користувач\n'
-        '3) Напишіть номер угоди цілим числом, в якій брав участь цей користувач\n'
-        '4) Напишіть повне або частину ім\'я користувача (мінімум 2 літери)'
+        '3) Напишіть номер (ID) угоди цілим числом, в якій брав участь цей користувач\n'
+        '4) Напишіть повне або частину ім\'я користувача (мінімум 2 літери)</pre>'
     )
     await msg.answer(text, reply_markup=basic_kb([Buttons.admin.to_admin]), disable_web_page_preview=True)
     await state.set_state(state='admin_search')
@@ -64,7 +64,7 @@ async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRep
     if msg.forward_from:
         user = await user_db.get_user(msg.forward_from.id)
         if user:
-            await send_user_info(msg, user, state)
+            await send_user_info(msg, user)
             return
     elif msg.forward_from_message_id:
         post = await post_db.get_post_admin_channel(msg.forward_from_message_id)
@@ -73,12 +73,12 @@ async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRep
             if deal.customer_id and deal.executor_id:
                 customer = await user_db.get_user(deal.customer_id)
                 executor = await user_db.get_user(deal.executor_id)
-                await send_user_info(msg, customer, state)
-                await send_user_info(msg, executor, state)
+                await send_user_info(msg, customer)
+                await send_user_info(msg, executor)
                 return
             else:
                 user = await user_db.get_user(post.user_id)
-                await send_user_info(msg, user, state)
+                await send_user_info(msg, user)
                 return
     else:
         if str(msg.text).isnumeric():
@@ -87,12 +87,12 @@ async def search_user_database(msg: Message, user_db: UserRepo, deal_db: DealRep
                 if deal.customer_id and deal.executor_id:
                     customer = await user_db.get_user(deal.customer_id)
                     executor = await user_db.get_user(deal.executor_id)
-                    await send_user_info(msg, customer, state)
-                    await send_user_info(msg, executor, state)
+                    await send_user_info(msg, customer)
+                    await send_user_info(msg, executor)
                     return
                 else:
                     user = await user_db.get_user(deal.customer_id)
-                    await send_user_info(msg, user, state)
+                    await send_user_info(msg, user)
                     return
         else:
             if len(msg.text) >= 2:

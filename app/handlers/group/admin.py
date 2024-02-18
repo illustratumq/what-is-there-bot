@@ -5,9 +5,9 @@ from aiogram.types import CallbackQuery, ChatType, Message
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Config
-from app.database.services.enums import UserStatusEnum
+from app.database.services.enums import UserStatusEnum, OrderTypeEnum
 from app.database.services.repos import UserRepo, RoomRepo, DealRepo, PostRepo, CommissionRepo, SettingRepo, JoinRepo, \
-    LetterRepo
+    LetterRepo, MerchantRepo, OrderRepo
 from app.fondy.new_api import FondyApiWrapper
 from app.handlers.admin.users import detail_user_info
 from app.handlers.userbot import UserbotController
@@ -62,6 +62,9 @@ async def cancel_deal_confirm(call: CallbackQuery, callback_data: dict, user_db:
 async def done_deal_confirm(call: CallbackQuery, callback_data: dict, user_db: UserRepo, deal_db: DealRepo,
                             room_db: RoomRepo, post_db: PostRepo):
     deal = await deal_db.get_deal(int(callback_data['deal_id']))
+    if deal.price == 0:
+        await call.answer('Ціна угоди не визначена')
+        return
     text = (
         f'{await construct_deal_text(deal, post_db, user_db, room_db)}\n\n'
         f'ℹ <b>При завершені угоди</b>, всі кошти, які були оплачені - нараховуються на '
@@ -127,6 +130,59 @@ async def select_user_cmd(call: CallbackQuery, callback_data: dict, user_db: Use
     )
     await call.message.edit_text(text, reply_markup=admin_choose_user_kb(deal))
 
+async def make_payout_cmd(call: CallbackQuery, callback_data: dict, commission_db: CommissionRepo,
+                          deal_db: DealRepo, user_db: UserRepo, merchant_db: MerchantRepo):
+    deal = await deal_db.get_deal(int(callback_data['deal_id']))
+    if deal.price == 0:
+        await call.answer('Ціна угоди не визначена')
+        return
+    elif deal.payed == deal.price:
+        await call.answer('Угода вже оплачена')
+        return
+    else:
+        await call.answer()
+    executor = await user_db.get_user(deal.executor_id)
+    customer = await user_db.get_user(deal.customer_id)
+    commission = await commission_db.get_commission(customer.commission_id)
+    need_to_pay = (deal.price - deal.payed) * 100
+    merchant = await merchant_db.get_merchant(commission.choose_merchant(need_to_pay))
+    await call.message.answer(
+        f'Для підтверження оплати перевірте транзакцію від {executor.create_html_link(executor.full_name)} '
+        f'у розмірі {round(merchant.calculate_commission(need_to_pay) / 100, 2)} грн. (ціна угоди без комісії'
+        f' {deal.price - deal.payed} грн.)',
+        reply_markup=admin_confirm_kb(deal, 'make_payed')
+    )
+
+async def confirm_make_payout(call: CallbackQuery, callback_data: dict, order_db: OrderRepo, deal_db: DealRepo,
+                              user_db: UserRepo, commission_db: CommissionRepo, post_db: PostRepo,
+                              room_db: RoomRepo):
+    deal = await deal_db.get_deal(int(callback_data['deal_id']))
+    customer = await user_db.get_user(deal.customer_id)
+    executor = await user_db.get_user(deal.executor_id)
+    commission = await commission_db.get_commission(customer.commission_id)
+    need_to_pay = (deal.price - deal.payed) * 100
+    merchant_id = commission.choose_merchant(need_to_pay)
+    order = await order_db.add(
+        type=OrderTypeEnum.ORDER, deal_id=deal.deal_id,
+        merchant_id=merchant_id, url='Платіж оплачений в ручному режимі',
+        payed=False, request_answer=dict(response={})
+    )
+    await order_db.create_log(order.id, f'Платіж створено і оплачено в ручному режимі {merchant_id=}')
+    text = (
+        '<b>Угода успішно оплачена</b>\n\n'
+        f'{executor.create_html_link(executor.full_name)}, можете приступати до роботи. '
+        f'{customer.create_html_link(customer.full_name)}, очікуйте на рішення.'
+    )
+    text_to_customer = (
+        f'Платіж за угоду №{deal.deal_id} проведено успішно'
+    )
+    await call.bot.send_message(chat_id=deal.chat_id, text=text)
+    await call.bot.send_message(chat_id=customer.user_id, text=text_to_customer)
+    await call.message.edit_text('Ви успішно підтвредити оплату угоди', reply_markup=None)
+    await deal_db.update_deal(deal.deal_id, payed=deal.price)
+    await call.bot.send_message(
+        call.from_user.id, await construct_deal_text(deal, post_db, user_db, room_db),
+        reply_markup=admin_command_kb(deal))
 
 async def edit_user_cmd(call: CallbackQuery, callback_data: dict, deal_db: DealRepo, user_db: UserRepo,
                         setting_db: SettingRepo):
@@ -236,6 +292,11 @@ def setup(dp: Dispatcher):
         cancel_deal_confirm, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='cancel_deal'), state='*')
     dp.register_callback_query_handler(
         cancel_deal_admin, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='conf_cancel_deal'), state='*')
+
+    dp.register_callback_query_handler(
+        make_payout_cmd, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='make_payed'), state='*')
+    dp.register_callback_query_handler(
+        confirm_make_payout, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='conf_make_payed'), state='*')
 
     dp.register_callback_query_handler(
         done_deal_confirm, ChatTypeFilter(ChatType.PRIVATE), admin_room_cb.filter(action='done_deal'), state='*')

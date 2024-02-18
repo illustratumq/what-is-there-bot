@@ -43,7 +43,8 @@ async def notify_admin(bot: Bot, userbot: UserbotController, admin_ids: tuple[in
     for admin_id in admin_ids:
         try:
             await bot.send_message(admin_id, f'Бот запущено {now()}')
-            await userbot._client.send_message(admin_id, 'Юзербот запущено')
+            if Device.current() == Device.SERVER:
+                await userbot._client.send_message(admin_id, 'Юзербот запущено')
         except aiogram.exceptions.ChatNotFound:
             log.warning(f'Адмін з {admin_id} не ініціалізував чат.')
 
@@ -82,11 +83,11 @@ async def main():
     await setup_default_merchants(sqlalchemy_session, config)
     await setup_default_commission_pack(sqlalchemy_session, config)
     await setup_default_admin_settings(sqlalchemy_session)
-    await notify_admin(bot, userbot, config.bot.admin_ids)
     await set_admin_status(sqlalchemy_session, config)
 
     try:
         scheduler.start()
+        await notify_admin(bot, userbot, config.bot.admin_ids)
         await dp.skip_updates()
         await dp.start_polling(allowed_updates=allowed_updates, reset_webhook=True)
     finally:

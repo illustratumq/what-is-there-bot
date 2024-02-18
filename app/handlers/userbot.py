@@ -43,9 +43,12 @@ class UserbotController:
     async def get_chat_members(self, chat_id: int) -> list:
         members = []
         await self.connect()
-        async for member in self._client.get_chat_members(chat_id):
-            member: ChatMember
-            members.append(member.user.id)
+        try:
+            async for member in self._client.get_chat_members(chat_id):
+                member: ChatMember
+                members.append(member.user.id)
+        except:
+            pass
         return members
 
     async def get_chat_history(self, chat_id: int) -> list[Message]:
@@ -124,7 +127,6 @@ class UserbotController:
                 await self._client.delete_messages(chat_id, message.id)
             except:
                 pass
-        await self._client.send_message(chat_id, 'The history was cleared successful')
 
     async def create_chat_link(self, chat_id: int):
         return await self._client.create_chat_invite_link(chat_id, name='New chat link')

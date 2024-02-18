@@ -264,7 +264,10 @@ async def pay_deal_customer_chat(msg: Message, deep_link: re.Match, deal_db: Dea
         response, order = await fondy.create_order(deal, need_to_pay, customer.inn)
         merchant = await merchant_db.get_merchant(order.merchant_id)
         if response['response']['response_status'] != 'success':
-            await msg.answer(response)
+            await msg.answer('Упс.. Виникли проблеми з оплатою угоди. Ми вже вирішуємо цю проблему!')
+            await msg.bot.send_message(config.misc.admin_help_channel_id,
+                                       f'🔴 <b>Помилка при сторвенні лінку на оплату {deal.deal_id=}</b>\n'
+                                       f'\n{response}')
             return
         url = response['response']['checkout_url']
         await order_db.update_order(order.id, url=url)

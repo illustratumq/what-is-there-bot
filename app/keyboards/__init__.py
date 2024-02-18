@@ -36,6 +36,7 @@ class DealAdmin:
     done_deal: str = 'Завершити угоду'
     cancel_deal: str = 'Відмінити угоду'
     restrict_user: str = '🔐 Обмежити користувача'
+    payed: str = 'Оплатити угоду вручу'
     customer: str = 'Замовник'
     executor: str = 'Виконавець'
     close: str = 'Закрити'
@@ -127,7 +128,7 @@ class Statistic:
     finance: str = 'Фінанси 💸'
     users: str = 'Користувачі 👤'
     update: str = 'Оновити 🔄'
-    date: str = 'Період 🗓'
+    date: str = 'Обрати 🗓'
 
 class Admin:
     statistic_menu = Statistic()
@@ -136,7 +137,7 @@ class Admin:
     statistic = 'Статистика 📊'
     commission: str = '💵 Комісія'
     setting: str = '⚙ Налаштування'
-    user: str = '🗂 Юзери'
+    user: str = '🔍 Юзери'
     menu: str = '🔁 В головне меню'
     edit: str = 'Редагувати'
     cancel: str = 'Відмінити'

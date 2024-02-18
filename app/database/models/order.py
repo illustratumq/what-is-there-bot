@@ -20,11 +20,18 @@ class Order(TimedBaseModel):
     def order_id(self) -> str:
         return str(int(self.created_at.timestamp()) + self.deal_id * self.id * int(self.created_at.microsecond / 10e3))
 
-    def calculate_payout(self):
-        actual_amount = int(self.request_answer['response']['actual_amount'])
-        amount = int(self.request_answer['response']['amount'])
-        commission_for_executor = round((actual_amount - amount), 2)
-        return round(amount - commission_for_executor, 2)
+    def calculate_payout(self, commission: bool = False):
+        if self.is_valid_response():
+            if 'actual_amount' in self.request_answer['response'].keys():
+                if self.request_answer['response']['actual_amount'] != '':
+                    actual_amount = int(self.request_answer['response']['actual_amount'])
+                    amount = int(self.request_answer['response']['amount'])
+                    commission_for_executor = round((actual_amount - amount), 2)
+                    if commission:
+                        return commission_for_executor
+                    else:
+                        return round(amount - commission_for_executor, 2)
+        return 0
 
     def is_valid_response(self):
         return 'error_message' not in self.request_answer['response'].keys()

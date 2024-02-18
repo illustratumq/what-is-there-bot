@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from app.config import Config
 from app.database.services.repos import UserRepo, PostRepo, RoomRepo, DealRepo, LetterRepo
 from app.handlers.admin.panel import admin_cmd
+from app.handlers.admin.statistic_v2 import statistic_cmd
 from app.handlers.group.admin import select_user_cmd, back_to_room_cmd
 from app.handlers.private.start import start_cmd
 from app.keyboards.inline.back import back_cb
@@ -25,6 +26,9 @@ async def back_cmd(call: CallbackQuery, callback_data: dict, user_db: UserRepo,
     elif to == 'admin':
         await call.message.delete()
         await admin_cmd(call.message, state, config)
+    elif to == 'stat_main_bar':
+        await call.message.delete()
+        await statistic_cmd(call.message)
 
 
 def setup(dp: Dispatcher):

@@ -1,55 +1,55 @@
+from datetime import timedelta
+
+from babel.dates import format_date
+
 from app.keyboards.inline.back import back_bt
 from app.keyboards.inline.base import *
+from app.misc.times import now
 
-statistic_cb = CallbackData('st', 'action', 'date', 'back')
+statistic_cb = CallbackData('st', 'action', 'param', 'bar')
 
 
-def menu_statistic_kb(date: str = 'today'):
+def menu_statistic_kb():
 
-    def button_cb(action: str):
-        return dict(callback_data=statistic_cb.new(action=action, date=date, back='admin'))
+    def button_cb(bar: str):
+        return dict(callback_data=statistic_cb.new(action='switch_to', bar=bar, param=''))
 
     statistic = Buttons.admin.statistic_menu
 
     inline_keyboard = [
-        [InlineKeyboardButton(statistic.posts, **button_cb('posts')),
-         InlineKeyboardButton(statistic.deals, **button_cb('deals'))],
-        [InlineKeyboardButton(statistic.users, **button_cb('users')),
-         InlineKeyboardButton(statistic.finance, **button_cb('finance'))],
+        [InlineKeyboardButton(statistic.finance, **button_cb('finance')),
+         InlineKeyboardButton(statistic.users, **button_cb('users'))],
+        [InlineKeyboardButton(statistic.deals, **button_cb('deals'))],
         [back_bt(to='admin')]
     ]
 
     return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
 
-def statistic_date_kb(back_to: str, current_date: str, only_back: bool = False):
 
-    def button_cb(date: str, act: str = back_to):
-        return dict(callback_data=statistic_cb.new(action=act, date=date, back=back_to))
+def statistic_mini_bar(bar: str, param: str):
 
-    statistic = Buttons.admin.statistic_menu.date_menu
-    inline_keyboard = [
-        [InlineKeyboardButton(statistic.day, **button_cb('today'))],
-        [InlineKeyboardButton(statistic.week, **button_cb('week')),
-         InlineKeyboardButton(statistic.month, **button_cb('month'))],
-        [InlineKeyboardButton(statistic.select_date, **button_cb('custom', 'date'))],
-        [InlineKeyboardButton(Buttons.menu.back, **button_cb(current_date, back_to))]
-    ]
-    if only_back:
-        inline_keyboard = [inline_keyboard[-1]]
-    return InlineKeyboardMarkup(row_width=2, inline_keyboard=inline_keyboard)
-
-def statistic_navigate_kb(update: str, date: str = 'today'):
-
-    def button_cb(action: str):
-        return dict(callback_data=statistic_cb.new(action=action, date=date, back=update))
+    def button_cb(action: str, param: str):
+        return dict(callback_data=statistic_cb.new(action=action, bar=bar, param=param))
 
     statistic = Buttons.admin.statistic_menu
 
-    return InlineKeyboardMarkup(
-        row_width=2,
-        inline_keyboard=[
-            [InlineKeyboardButton(statistic.date, **button_cb('date')),
-             InlineKeyboardButton(statistic.update, **button_cb(update))],
-            [back_bt(to='statistic')]
-        ]
-    )
+    inline_keyboard = [
+        [InlineKeyboardButton(statistic.date, **button_cb('date', 'input')),
+         InlineKeyboardButton(statistic.update, **button_cb(action='switch_to', param=param))],
+        [back_bt(to='stat_main_bar')]
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard, row_width=2)
+
+def go_to_bar(times: str):
+    def button_cb(bar: str):
+        return dict(callback_data=statistic_cb.new(action='switch_to', bar=bar, param=times))
+
+    statistic = Buttons.admin.statistic_menu
+
+    return InlineKeyboardMarkup(row_width=2, inline_keyboard=[
+        [InlineKeyboardButton('обрати ' + statistic.finance, **button_cb('finance'))],
+        [InlineKeyboardButton('обрати ' + statistic.users, **button_cb('users'))],
+        [InlineKeyboardButton('обрати ' + statistic.deals, **button_cb('deals'))],
+        [back_bt(to='admin')]
+    ])

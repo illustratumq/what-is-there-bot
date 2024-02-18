@@ -1,6 +1,6 @@
 from app.database.models import *
 from app.database.services.db_ctx import BaseRepo
-from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, OrderTypeEnum
+from app.database.services.enums import DealStatusEnum, RoomStatusEnum, DealTypeEnum, OrderTypeEnum, UserStatusEnum
 from app.misc.times import now, deltatime
 
 
@@ -9,6 +9,9 @@ class UserRepo(BaseRepo[User]):
 
     async def get_user(self, user_id: int) -> User:
         return await self.get_one(self.model.user_id == user_id)
+
+    async def get_users_status(self, status: UserStatusEnum) -> list[User]:
+        return await self.get_all(self.model.status == status)
 
     async def get_users_commission(self, commission_id: int, count: bool = False):
         if count:
@@ -200,6 +203,9 @@ class OrderRepo(BaseRepo[Order]):
 
     async def get_orders_deal(self, deal_id: int, order_type: OrderTypeEnum) -> list[Order]:
         return await self.get_all(self.model.deal_id == deal_id, self.model.type == order_type)
+
+    async def get_orders(self, order_type: OrderTypeEnum) -> list[Order]:
+        return await self.get_all(self.model.type == order_type)
 
     async def update_order(self, order_id: int, **kwargs) -> None:
         return await self.update(self.model.id == order_id, **kwargs)
