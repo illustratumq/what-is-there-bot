@@ -81,7 +81,7 @@ class FondyApiWrapper:
         if reservation_data:
             inn = base64.b64encode(('{\n  "receiver_inn": "' + str(reservation_data) + '"\n}').encode('utf-8'))
             inn = str(inn).replace("b'", '').replace("'", '')
-            data['request'].update(receiver_data=str(inn))
+            data['request'].update(reservation_data=str(inn))
         await order_db.update_order(order.id, request_body=dict(data['request']))
         self.pull_signature(data, merchant.secret_key)
         response = await self._post(self.order_url, data)
