@@ -95,12 +95,13 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
     for order in orders:
         merchant = await merchant_db.get_merchant(order.merchant_id)
         response = await fondy.check_order(order, merchant)
-        if response['response']['order_status'] == 'approved':
-            response = await fondy.reverse_order(order, merchant, 'Угода була відмінена' if not message else message)
-            reversed_orders.append(order)
-            if response['response']['reverse_status'] != 'approved':
-                await bot.send_message(config.misc.admin_help_channel_id,
-                                       text=f'🔴💳 Не вдалось зробити <b>reverse</b>\n\n{order.id=}')
+        if order.is_valid_response():
+            if response['response']['order_status'] == 'approved':
+                response = await fondy.reverse_order(order, merchant, 'Угода була відмінена' if not message else message)
+                reversed_orders.append(order)
+                if response['response']['reverse_status'] != 'approved':
+                    await bot.send_message(config.misc.admin_help_channel_id,
+                                           text=f'🔴💳 Не вдалось зробити <b>reverse</b>\n\n{order.id=}')
     for user_id in deal.participants:
         text = f'Угода "{post.title}" була відмінена.' if not message else message
         await bot.send_message(user_id, text)
@@ -202,27 +203,28 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, state:
         for order in orders:
             merchant = await merchant_db.get_merchant(order.merchant_id)
             response = await fondy.check_order(order, merchant)
-            if response['response']['order_status'] == 'approved':
-                if payed < deal.price:
-                    actual_amount = int(response['response']['actual_amount'])
-                    amount = int(response['response']['amount'])
-                    clear_amount = round(amount / 100, 2)
-                    if payed + clear_amount > deal.price:
-                        particular_capture = deal.price - payed
-                        response = await fondy.make_capture(order, merchant, int(particular_capture * 100))
-                        back_to_customer += clear_amount - particular_capture
+            if order.is_valid_response():
+                if response['response']['order_status'] == 'approved':
+                    if payed < deal.price:
+                        actual_amount = int(response['response']['actual_amount'])
+                        amount = int(response['response']['amount'])
+                        clear_amount = round(amount / 100, 2)
+                        if payed + clear_amount > deal.price:
+                            particular_capture = deal.price - payed
+                            response = await fondy.make_capture(order, merchant, int(particular_capture * 100))
+                            back_to_customer += clear_amount - particular_capture
+                        else:
+                            commission_for_executor += round((actual_amount - amount) / 100, 2)
+                            response = await fondy.make_capture(order, merchant)
+                        if response['response']['capture_status'] != 'captured':
+                            await call.bot.send_message(config.misc.admin_help_channel_id,
+                                                        text=f'🔴💳 Не вдалось зробити <b>capture</b>\n\n{order.id=}')
                     else:
-                        commission_for_executor += round((actual_amount - amount) / 100, 2)
-                        response = await fondy.make_capture(order, merchant)
-                    if response['response']['capture_status'] != 'captured':
-                        await call.bot.send_message(config.misc.admin_help_channel_id,
-                                                    text=f'🔴💳 Не вдалось зробити <b>capture</b>\n\n{order.id=}')
-                else:
-                    merchant = await merchant_db.get_merchant(order.merchant_id)
-                    response = await fondy.reverse_order(order, merchant, 'Повернення коштів')
-                    if 'error_message' in response['response'].keys():
-                        await call.bot.send_message(config.misc.admin_help_channel_id,
-                                                    text=f'🔴💳 Не вдалось зробити <b>reverse</b> під час закриття угоди\n\n{order.id=}')
+                        merchant = await merchant_db.get_merchant(order.merchant_id)
+                        response = await fondy.reverse_order(order, merchant, 'Повернення коштів')
+                        if 'error_message' in response['response'].keys():
+                            await call.bot.send_message(config.misc.admin_help_channel_id,
+                                                        text=f'🔴💳 Не вдалось зробити <b>reverse</b> під час закриття угоди\n\n{order.id=}')
         executor = await user_db.get_user(deal.executor_id)
         customer = await user_db.get_user(deal.customer_id)
         balance_for_executor = executor.balance + deal.price - commission_for_executor
