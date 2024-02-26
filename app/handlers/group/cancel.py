@@ -145,7 +145,8 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
         try:
             if user_id:
                 if user_id not in (await userbot.get_client_user_id(), (await bot.me).id):
-                    await userbot.kick_chat_member(room.chat_id, user_id)
+                    await bot.kick_chat_member(room.chat_id, user_id)
+                    # await userbot.kick_chat_member(room.chat_id, user_id)
         except Exception as error:
             log.warning(str(error) + f'\n{deal.deal_id=}')
     executor = await user_db.get_user(deal.executor_id)
@@ -160,7 +161,8 @@ async def cancel_deal_processing(bot: Bot, deal: DealRepo.model, state: FSMConte
         else:
             await deal_db.update_deal(deal.deal_id, customer_id=None)
     join = await join_db.get_post_join(deal.customer_id, deal.executor_id, post.post_id)
-    await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
+    if join:
+        await join_db.update_join(join.join_id, status=JoinStatusEnum.USED)
     await deal_db.update_deal(deal.deal_id, status=DealStatusEnum.ACTIVE, price=post.price,
                               payed=0, chat_id=None, executor_id=None, next_activity_date=None, activity_confirm=True)
     await deal.create_log(deal_db, deal_log_text)
@@ -267,7 +269,8 @@ async def done_deal_processing(call: CallbackQuery, deal: DealRepo.model, state:
             try:
                 if user_id:
                     if user_id not in (await userbot.get_client_user_id(), (await call.bot.me).id):
-                        await userbot.kick_chat_member(deal.chat_id, user_id=user_id)
+                        await call.bot.kick_chat_member(room.chat_id, user_id)
+                        # await userbot.kick_chat_member(room.chat_id, user_id)
             except Exception as error:
                 log.error(str(error) + f'\n{deal.deal_id=}')
         if deal.type == DealTypeEnum.PRIVATE:

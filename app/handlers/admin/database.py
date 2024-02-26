@@ -99,7 +99,6 @@ async def save_database_json(user_db: UserRepo, deal_db: DealRepo, post_db: Post
                 PostStatusText,
                 RoomStatusEnum,
                 DealStatusEnum,
-                OrderStatusEnum,
                 OrderTypeEnum,
                 JoinStatusEnum,
                 DealTypeEnum
