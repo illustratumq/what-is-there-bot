@@ -61,7 +61,7 @@ async def publish_all_confirm(call: CallbackQuery, callback_data: dict, post_db:
         await call.answer('Мінімальна затримка 10 секунд', show_alert=True)
         return
 
-    posts = await post_db.get_posts_status(DealStatusEnum.MODERATE)
+    posts = await post_db.get_posts_moderate()
     end_published_time = now() + timedelta(seconds=len(posts) * delay)
     text = (
         f'Ви хочете опублікувати {len(posts)} постів?\n\n'

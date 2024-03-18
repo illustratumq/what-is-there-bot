@@ -38,6 +38,9 @@ class PostRepo(BaseRepo[Post]):
     async def get_posts_status(self, status: DealStatusEnum) -> list[Post]:
         return await self.get_all(self.model.status == status)
 
+    async def get_posts_moderate(self):
+        return await self.get_all(self.model.status == DealStatusEnum.MODERATE, self.model.type == DealTypeEnum.PUBLIC)
+
     async def get_post_admin_channel(self, message_id: int) -> Post:
         return await self.get_one(self.model.admin_message_id == message_id)
 

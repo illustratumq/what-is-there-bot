@@ -27,10 +27,15 @@ async def edit_price_cmd(call: CallbackQuery, callback_data: dict, deal_db: Deal
     executor = await user_db.get_user(deal.executor_id)
     commission = await commission_db.get_commission(customer.commission_id)
     text = (
-        f'Щоб встановити ціну угоди, {customer.full_name} та '
-        f'{executor.full_name} повинні відправити одне й те саме ціле число. '
-        f'Мінімальна ціна — {commission.minimal} грн.\n\n'
-        f'ℹ В нашому сервісі встановлена комісія, з якою Ви можете ознайомитись за посиланням.'
+        'Для встановлення вартості угоди, <b>кожен з учасників</b> має відправити текстове повідомлення, '
+        'в якому вказана ціна за виконання завдання.'
+        '<b>Комісія сервісу:</b>\n'
+        '(ціна угоди - комісія)\n'
+        'від 30 грн до 99 грн – 10%\n'
+        'від 100 грн до 201 грн – 7%\n'
+        'від 201 грн і вище – 5%\n\n'
+        'Мінімальна ціна угоди: 30 грн\n\n'
+        'Ціна повинна бути вказана лише цілим числом.'
     )
     await call.message.answer(text, disable_web_page_preview=True, reply_markup=back_chat_kb(deal))
     await state.storage.set_state(chat=call.message.chat.id, user=deal.customer_id, state='set_price')

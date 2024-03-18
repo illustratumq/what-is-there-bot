@@ -18,7 +18,7 @@ def make_post_media_template(title: str, description: str, price: int, version: 
     font = ImageFont.truetype('RockStar-Bold.ttf', 96)
     drawer = ImageDraw.Draw(logo)
     drawer.text((110, 130), split_string(title, 18), fill='#000000', font=font)
-    font = ImageFont.truetype('RockStar-Bold.ttf', 50)
+    font = ImageFont.truetype('RockStar-Bold.ttf', 45)
     y_pos = 280 + 50 * (len(title) // 18)
     drawer.text((110, y_pos), split_string(description), fill='#4D4D4D', font=font)
     font = ImageFont.truetype('RockStar-Bold.ttf', 58)
@@ -58,7 +58,7 @@ def make_chat_photo_template(path: str, number: int):
     return new_path
 
 
-def split_string(text: str, max_string_length: int = 30, max_text_length: int = 110):
+def split_string(text: str, max_string_length: int = 32, max_text_length: int = 110):
     text = text.replace('\n', ' ').replace('.', '. ').replace('!', '! ').replace('?', '? ')
     text = text.replace('.  ', '. ').replace('!  ', '! ').replace('?  ', '? ')
     words = text.split(' ')
@@ -73,9 +73,8 @@ def split_string(text: str, max_string_length: int = 30, max_text_length: int = 
         else:
             new_text += word
         if len(new_text) >= max_text_length:
-            new_text += '[...]'
+            new_text += '...'
             break
         else:
             new_text += ' '
     return new_text
-

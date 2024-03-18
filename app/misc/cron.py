@@ -81,9 +81,8 @@ async def setup_cron_function(scheduler: ContextSchedulerDecorator):
     scheduler.add_job(
         func=checkout_payments, trigger='interval', seconds=30, name='Перевірка платіжок'
     )
-    scheduler.add_job(checking_chat_activity_func, trigger='date', next_run_time=now() + timedelta(seconds=5))
     scheduler.add_job(
-       func=checking_chat_activity_func, trigger='interval', seconds=60, name='Перевірка активності чатів'
+       func=checking_chat_activity_func, trigger='interval', seconds=600, name='Перевірка активності чатів'
     )
     log.info('Cron функції успішно заплановані')
 
@@ -92,13 +91,13 @@ async def checking_chat_activity_func(session: sessionmaker, bot: Bot, userbot: 
                                       fondy: FondyApiWrapper):
     db = database(session)
     for deal in await db.deal_db.get_deal_status(DealStatusEnum.BUSY):
-        if deal.payed == 0 and deal.next_activity_date and localize(deal.next_activity_date) <= now():
+        if deal.payed == 0 and deal.next_activity_date and deal.next_activity_date <= datetime.now():
             executor = await db.user_db.get_user(deal.executor_id)
             customer = await db.user_db.get_user(deal.customer_id)
             if deal.activity_confirm:
                 text = (
                     f'{customer.create_html_link(customer.full_name)} та {executor.create_html_link(executor.full_name)}, '
-                    f'ваша угода актуальна?.\n\n'
+                    f'ваша угода актуальна?\n\n'
                     f'Зауважте, якщо впродовж наступних 12 годин, не підтвердити актуальність угоди, '
                     f'вона буде автоматично відмінена.'
                 )

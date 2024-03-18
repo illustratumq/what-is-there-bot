@@ -36,7 +36,7 @@ async def new_post_title(msg: Message, state: FSMContext, setting_db: SettingRep
         await msg.answer('Адміністрація сервісу заборонила вам бути Замовником')
     else:
         text = (
-            'Напишіть назву предмету або що потрібно зробити'
+            'Крок 1/5\n\nНапишіть назву предмета чи завдання.'
         )
         message = await msg.answer(text, reply_markup=cancel_kb)
         await state.update_data(last_msg_id=message.message_id, template_media_file=None)
@@ -49,8 +49,7 @@ async def new_post_about(msg: Message, state: FSMContext):
     if await check_is_title_ok(msg, data):
         await state.update_data(title_message_id=msg.message_id)
         text = (
-            'Максимально докладно опишіть завдання\n\n'
-            'Порада: Додайте інформацію про термін здачі роботи'
+            'Крок 2/5\n\nМаксимально докладно опишіть завдання.'
         )
         await PostSG.About.set()
     else:
@@ -63,7 +62,7 @@ async def new_post_price(msg: Message, state: FSMContext):
     await clear_last_message(await state.get_data(), msg)
     data = {}
     if await check_is_about_ok(msg, data):
-        text = 'Надішліть ціну за завдання (ціле число)'
+        text = 'Крок 3/5\n\nНапишіть бажану ціну за завдання (ціле число)'
         buttons = [Buttons.post.contract], [Buttons.action.cancel]
         data.update(about_message_id=msg.message_id)
         await PostSG.Price.set()
@@ -86,8 +85,8 @@ async def new_post_media(msg: Message, state: FSMContext, user_db: UserRepo, com
         await state.update_data(last_msg_id=message.message_id)
         return
     text = (
-        f'Надішліть файли або фото, що стосуються завдання, якщо вони є.'
-        f'Після закінчення натисніть кнопку <b>{Buttons.action.confirm}</b>'
+        f'Крок 4/5\n\nНадішліть будь-які файли або фотографії, що відносяться до завдання, якщо такі є. '
+        f'Після завершення натисніть кнопку  <b>{Buttons.action.confirm}</b>'
     )
     await msg.answer(text, reply_markup=basic_kb(([Buttons.action.confirm], [Buttons.action.cancel])))
     await PostSG.Media.set()
@@ -122,10 +121,9 @@ async def new_post_confirm_media(msg: Message, state: FSMContext, config: Config
     post_msg = await msg.answer(construct_post_text(data))
     await state.update_data(post_message_id=post_msg.message_id, no_media=no_media)
     await msg.answer(
-        f'<b>Пост готовий!</b>\n\n'
-        f'Щоб змінити вміст посту, просто відредагуйте повідомлення, з яких він був зібраний (окрім матеріалів).\n\n'
-        f'Якщо все правильно, натисніть кнопку "{Buttons.post.publish}", щоб опублікувати пост на каналі.\n\n'
-        f'Щоб зробити ціну договірною, змініть її на "0".',
+        f'Крок 5/5\n\n<b>Ви на фінальному етапі.</b>\n\n'
+        f'Перевірте чи все вірно вказано?\n\n'
+        f'Якщо все вірно, натисніть кнопку "{Buttons.post.publish}", щоб опублікувати пост на каналі.',
         reply_markup=basic_kb(([Buttons.post.publish], [Buttons.action.cancel]))
     )
     await PostSG.Confirm.set()

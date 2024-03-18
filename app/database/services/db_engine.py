@@ -19,9 +19,9 @@ async def create_db_engine_and_session_pool(sqlalchemy_url: str, config) -> tupl
     )
 
     async with engine.begin() as conn:
-        if config.db.reset_db:
-            await conn.run_sync(BaseModel.metadata.drop_all)
-            log.info('База данних перезаписана...')
+        # if config.db.reset_db:
+        #     await conn.run_sync(BaseModel.metadata.drop_all)
+        #     log.info('База данних перезаписана...')
         await conn.run_sync(BaseModel.metadata.create_all)
         log.info('Створюю сессію до БД...')
 

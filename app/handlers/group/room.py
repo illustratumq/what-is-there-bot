@@ -14,6 +14,7 @@ from app.handlers.userbot import UserbotController
 from app.keyboards.inline.chat import room_menu_kb, room_cb, call_another_user
 from app.keyboards.inline.deal import help_admin_kb, add_chat_cb, add_admin_chat_kb
 from app.misc.commands import set_new_room_commands
+from app.misc.times import now
 
 
 async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, user_db: UserRepo,
@@ -31,7 +32,7 @@ async def process_chat_join_request(cjr: ChatJoinRequest, deal_db: DealRepo, use
         await cjr.bot.delete_message(cjr.from_user.id, data['last_msg_id'])
     if deal.customer_id in members and deal.executor_id in members:
         await deal_db.update_deal(
-            deal.deal_id, next_activity_date=datetime.now() + timedelta(minutes=config.misc.chat_activity_period))
+            deal.deal_id, next_activity_date=datetime.now() + timedelta(days=1))
         await full_room_action(cjr, deal, user_db, post_db, config)
         await room_db.update_room(deal.chat_id, both_in_chat=True)
         await deal.create_log(deal_db, f'Угода розпочата з ціною {deal.price}')
@@ -82,8 +83,8 @@ async def full_room_action(cjr: ChatJoinRequest, deal: Deal, user_db: UserRepo, 
     if deal.type == DealTypeEnum.PUBLIC:
         message = await cjr.bot.send_message(cjr.chat.id, post.construct_post_text(use_bot_link=False))
     await cjr.chat.pin_message(message_id=message.message_id)
-    if post.media_id:
-        await cjr.bot.copy_message(cjr.chat.id, config.misc.media_channel_chat_id, post.media_id)
+    # if post.media_id:
+    #     await cjr.bot.copy_message(cjr.chat.id, config.misc.media_channel_chat_id, post.media_id)
     text = (
         f'💬 Меню чату "{post.title}"\n\n'
         f'<b>Замовник</b>: {customer.mention}\n'
