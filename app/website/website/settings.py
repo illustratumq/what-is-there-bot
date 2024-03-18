@@ -28,7 +28,7 @@ from app.website.website.jazzmin_settings import JAZZMIN_SETTINGS
 config = Config.from_env()
 
 
-ALLOWED_HOSTS = ['*']  # , config.misc.server_host_ip
+ALLOWED_HOSTS = ['*'] # ,config.misc.server_host_ip
 
 # Application definition
 
@@ -85,7 +85,7 @@ DATABASES = {
         'NAME': config.db.database,
         'USER': config.db.user,
         'PASSWORD': config.db.password,
-        'HOST': config.db.host,
+        'HOST': '176.117.78.36',
         'PORT': config.db.port
     }
 }

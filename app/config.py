@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from environs import Env
 from sqlalchemy.engine import URL
 
+log = logging.getLogger(__name__)
 
 @dataclass
 class DbConfig:
@@ -15,15 +16,9 @@ class DbConfig:
     reset_db: bool
 
     @property
-    def sqlalchemy_url(self) -> URL:
-        return URL.create(
-            'postgresql+asyncpg',
-            username=self.user,
-            password=self.password,
-            host=self.host,
-            port=self.port,
-            database=self.database
-        )
+    def sqlalchemy_url(self) -> str:
+       log.info('here') 
+       return f'postgresql+asyncpg://{self.user}:{self.password}@176.117.78.36:{self.port}/{self.database}'
 
 
 @dataclass

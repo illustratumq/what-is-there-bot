@@ -61,6 +61,7 @@ async def main():
 
     bot = Bot(config.bot.token, parse_mode=ParseMode.HTML)
     dp = Dispatcher(bot, storage=storage)
+    log.info(f'{config.db.sqlalchemy_url}, {config.db.database}')
     db_engine, sqlalchemy_session = await create_db_engine_and_session_pool(config.db.sqlalchemy_url, config)
     userbot = UserbotController(config.userbot, (await bot.me).username, 'app/data/chat.jpg')
     fondy = FondyApiWrapper(sqlalchemy_session)
