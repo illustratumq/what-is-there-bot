@@ -4,7 +4,6 @@ from aiogram import Dispatcher, Bot
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import ChatTypeFilter
 from aiogram.types import Message, ChatType, CallbackQuery
-from marshmallow import pprint
 
 from app.config import Config
 from app.database.services.enums import DealStatusEnum, OrderTypeEnum
@@ -43,7 +42,7 @@ async def my_balance_cmd(msg: Message, order_db: OrderRepo, deal_db: DealRepo,
                 cards.add(order.get_request_body['receiver_card_number'])
     if orders_to_pay:
         cards = list(cards)
-        payout = round(sum([order.calculate_payout() for order in orders_to_pay]) / 100, 2)
+        payout = round(sum([order.calculate_payout() for order in orders_to_pay]) / 100, 1)
         text = f'Тобі доступна сума до виплати {payout} грн'
         if cards:
             text += '\n\nОберіть карту для виплати 👇'
