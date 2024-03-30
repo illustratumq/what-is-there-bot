@@ -90,7 +90,8 @@ class DealAdmin(admin.ModelAdmin):
 
     form = BaseForm
     list_filter = ('status',)
-    list_display = ('__str__',  'status', 'view_post_link', 'view_customer_link', 'view_executor_link', 'updated_at')
+    list_display = ('__str__',  'status', 'view_post_link', 'view_customer_link', 'view_executor_link',
+                    'chat_id', 'updated_at')
     search_fields = ('customer_id__startswith', 'executor_id__startswith', 'deal_id__startswith')
     ordering = ['-updated_at']
     readonly_fields = ('log', 'created_at', 'updated_at')
@@ -225,7 +226,7 @@ class OrderAdmin(admin.ModelAdmin):
         fields.JSONField: {'widget': JSONEditorWidget},
     }
 
-    list_display = ('id', 'type', 'payed', 'updated_at')
+    list_display = ('id', 'type', 'payed', 'deal_id', 'updated_at')
     search_fields = ('id__startswith', 'deal_id__startswith')
     readonly_fields = ('created_at', 'updated_at', 'merchant_id', 'url', 'log', 'request_body', 'request_answer')
     ordering = ['-updated_at']

@@ -117,6 +117,7 @@ async def save_card_and_make_payout(upd: Message | CallbackQuery, state: FSMCont
                                       f'Створено платіж на виплату суми {round(price_sum/100, 2)} грн.')
             if result:
                 await msg.answer('Виплата пройшла успішно. Очікуйте на зарахування коштів')
+                # await order_db.update_order(order_payout.id, )
                 for order in orders_to_pay[merchant.merchant_id][deal.deal_id]:
                     await order_db.create_log(order.id,
                                               f'Платіж успішно виплачено, ID платіжу виплати={order_payout.id}')
